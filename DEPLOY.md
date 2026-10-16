@@ -1,61 +1,67 @@
-# 🚀 Deploy gratis (para que el link de WhatsApp funcione por internet)
+# 🚀 Deploy en Railway (gratis)
 
-La app necesita dos cosas en la nube: **el servidor Node** y **una base MySQL**.
-Ambas tienen opciones gratuitas. Esta es la ruta más simple.
+Railway corre el **Node** y te da la **base MySQL** en el mismo proyecto, así que es lo más simple para esta app. El código ya se auto-configura: al arrancar **crea las tablas solo** y, si le pasás variables, **crea el admin solo**. No hace falta tocar la base a mano.
 
----
-
-## Paso 1 — Base de datos MySQL gratis
-
-Elegí **uno** de estos proveedores (todos tienen plan gratis con MySQL):
-
-| Proveedor | Link | Notas |
-|---|---|---|
-| **Clever Cloud** | clever-cloud.com | MySQL gratis chico, estable. Recomendado. |
-| **Aiven** | aiven.io | Plan free de MySQL. |
-| **Railway** | railway.app | MySQL con créditos gratis mensuales. |
-
-Cuando crees la base, anotá estos datos (te los da el panel del proveedor):
-- **host** (ej: `xxx.mysql.database.azure.com` o similar)
-- **puerto** (casi siempre `3306`)
-- **usuario**
-- **contraseña**
-- **nombre de la base**
-
-### Crear las tablas en la base de la nube
-Desde tu PC, con esos datos, editá el `.env` temporalmente apuntando a la base de la nube y corré:
-```bash
-npm run init-db
-npm run create-admin
-```
-(O usá el cliente web del proveedor e importá `server/db/schema.sql`.)
-Después volvé a dejar el `.env` como estaba para desarrollo local.
+> **Ojo con GitHub:** GitHub solo *guarda* el código; no puede *ejecutar* esta app (tiene backend Node + MySQL). Por eso se usa Railway para que ande online.
 
 ---
 
-## Paso 2 — Servidor en Render (gratis)
+## Pasos
 
-1. Subí este proyecto a un repositorio de **GitHub**.
-2. Entrá a [render.com](https://render.com) → **New +** → **Web Service** → conectá tu repo.
-3. Render detecta el `render.yaml`. Configurá las variables de entorno con los datos del Paso 1:
-   - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
-   - `PUBLIC_URL` → la URL que te da Render, ej: `https://acordes.onrender.com`
-   - `JWT_SECRET` → Render lo genera solo (o poné una cadena larga).
-4. **Deploy**. En unos minutos tenés tu app en `https://acordes.onrender.com`.
+### 1. Entrar a Railway
+- Andá a **[railway.app](https://railway.app)** y entrá con tu cuenta de **GitHub**.
 
-> El `PUBLIC_URL` es importante: es lo que hace que los **links de compartir** salgan con la dirección pública (y no `localhost`), así funcionan por WhatsApp para cualquiera.
+### 2. Crear el proyecto desde el repo
+- **New Project** → **Deploy from GitHub repo** → elegí **`jairobandera/acordes`**.
+- Railway detecta Node y corre `npm install` + `npm start` solo.
+
+### 3. Agregar la base MySQL
+- Dentro del proyecto: **New** (o **Create**) → **Database** → **Add MySQL**.
+- Railway crea la base y sus variables (`MYSQLHOST`, `MYSQLPORT`, etc.).
+
+### 4. Conectar la app con la base (Variables)
+- Entrá al servicio **acordes** (el de Node) → pestaña **Variables** → agregá estas
+  (las de la base se escriben con referencias `${{ MySQL.XXX }}`, Railway las completa):
+
+| Variable | Valor |
+|---|---|
+| `DB_HOST` | `${{ MySQL.MYSQLHOST }}` |
+| `DB_PORT` | `${{ MySQL.MYSQLPORT }}` |
+| `DB_USER` | `${{ MySQL.MYSQLUSER }}` |
+| `DB_PASSWORD` | `${{ MySQL.MYSQLPASSWORD }}` |
+| `DB_NAME` | `${{ MySQL.MYSQLDATABASE }}` |
+| `JWT_SECRET` | una cadena larga y secreta (inventala) |
+| `ADMIN_USERNAME` | `admin` |
+| `ADMIN_PASSWORD` | la clave que quieras para el admin |
+| `PUBLIC_URL` | (lo completás en el paso 6) |
+
+> `PORT` lo pone Railway solo; la app ya lo respeta.
+
+### 5. Primer deploy
+- Railway redeploya al guardar las variables. En los **logs** del servicio deberías ver:
+  ```
+  ✓ Conectado a MySQL.
+  ✓ Admin "admin" creado desde variables de entorno.
+  🎸 Acordes corriendo en ...
+  ```
+  (Las tablas y el admin se crean solos en este primer arranque.)
+
+### 6. Generar el dominio público
+- Servicio **acordes** → **Settings** → **Networking** → **Generate Domain**.
+- Copiá la URL (ej. `https://acordes-production.up.railway.app`).
+- Volvé a **Variables** y poné esa URL en **`PUBLIC_URL`** (para que los links de compartir salgan bien).
+
+### 7. ¡Listo!
+- Entrá a tu URL pública, logueate con `admin` / la clave que pusiste, y a usar la app.
+- Los links de compartir por WhatsApp ahora funcionan para cualquiera.
 
 ---
 
-## Notas del plan gratis
+## Sobre el límite / tu app vieja
+Railway tiene **créditos gratis mensuales** compartidos entre todos tus servicios. Si ya tenías otra app corriendo ahí y no la usás, conviene **darla de baja** para no gastar créditos:
+- En railway.app → abrí ese proyecto viejo → **Settings** → **Delete Project** (o pausá el servicio).
 
-- **Render free** duerme el servicio tras ~15 min sin uso: la primera visita después de dormir tarda ~30 seg en despertar. Para una app de banda está perfecto.
-- La base MySQL gratis suele tener límite de tamaño (sobra para miles de canciones).
-- Si más adelante querés algo sin "dormir", los planes pagos de Render arrancan baratos.
+---
 
-## Alternativa todo-en-uno: Railway
-En [railway.app](https://railway.app) podés tener **Node + MySQL en el mismo proyecto**:
-1. New Project → Deploy from GitHub repo.
-2. Add → Database → MySQL.
-3. En el servicio Node, mapeá las variables (`DB_HOST=${{MySQL.MYSQLHOST}}`, etc.) y definí `PUBLIC_URL`.
-4. Deploy.
+## Alternativa: Render
+Si preferís Render (corre el Node gratis, con la base MySQL en otro proveedor como Clever Cloud/Aiven), hay un `render.yaml` en el repo. Las variables son las mismas de la tabla de arriba.

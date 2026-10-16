@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { assertDbConnection } from './db/pool.js';
+import { ensureSchema, ensureAdmin } from './db/ensureSchema.js';
 import authRoutes from './routes/auth.js';
 import searchRoutes from './routes/search.js';
 import songRoutes from './routes/songs.js';
@@ -49,9 +50,12 @@ async function start() {
   try {
     await assertDbConnection();
     console.log('✓ Conectado a MySQL.');
+    // Auto-crea las tablas (y el admin desde env) si hace falta.
+    await ensureSchema();
+    await ensureAdmin();
   } catch (err) {
     console.error('✗ No se pudo conectar a MySQL:', err.message);
-    console.error('  Asegurate de que XAMPP tenga MySQL corriendo y de haber hecho: npm run init-db');
+    console.error('  Asegurate de que MySQL esté corriendo (en local: XAMPP).');
   }
   app.listen(PORT, () => {
     console.log(`\n🎸 Acordes corriendo en  http://localhost:${PORT}\n`);

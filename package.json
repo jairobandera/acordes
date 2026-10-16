@@ -4,6 +4,9 @@
   "description": "App web para buscar, scrapear, transponer y organizar acordes de lacuerda.net con login, listas y metronomo.",
   "type": "module",
   "main": "server/index.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
