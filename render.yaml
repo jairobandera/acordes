@@ -1,0 +1,27 @@
+# Config para desplegar en Render (https://render.com) — plan gratuito.
+# Render corre el servidor Node. La base MySQL va en un proveedor aparte
+# (ver DEPLOY.md). Completá las variables de entorno en el panel de Render.
+services:
+  - type: web
+    name: acordes
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: JWT_SECRET
+        generateValue: true          # Render genera una clave segura
+      - key: PUBLIC_URL
+        sync: false                  # ej: https://acordes.onrender.com
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        sync: false

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lista compartida · Acordes</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="share-page">
+    <header class="share-head">
+      <div class="topbar-brand"><span class="logo-dot"></span> Acordes</div>
+      <a href="/" class="btn-link">Ir a la app ›</a>
+    </header>
+
+    <div id="shareStatus" class="status" style="padding:20px 0">Cargando lista…</div>
+
+    <div id="shareContent" class="hidden">
+      <h1 id="plName" class="view-title" style="margin-bottom:4px"></h1>
+      <p id="plOwner" class="song-artist" style="margin-top:0"></p>
+      <div id="songList" class="share-songs"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script type="module" src="/js/share.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "name": "acordes-app",
+  "version": "1.0.0",
+  "description": "App web para buscar, scrapear, transponer y organizar acordes de lacuerda.net con login, listas y metronomo.",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "init-db": "node server/db/initdb.js",
+    "migrate": "node server/db/migrate.js",
+    "create-admin": "node server/db/createAdmin.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cheerio": "^1.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.11.3"
+  }
+}
