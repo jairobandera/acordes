@@ -12,17 +12,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export async function ensureSchema() {
   const sql = readFileSync(join(__dirname, 'schema.sql'), 'utf8');
 
-  // Sacamos las líneas de CREATE DATABASE / USE (la base ya existe y está seleccionada).
-  const cleaned = sql
+  // 1) Sacamos las líneas de comentario (-- ...) ANTES de separar por ';',
+  //    si no, un comentario pegado a un CREATE TABLE se lleva la sentencia entera.
+  const noComments = sql
     .split('\n')
-    .filter((line) => !/^\s*(CREATE\s+DATABASE|USE)\b/i.test(line))
+    .filter((line) => !/^\s*--/.test(line))
     .join('\n');
 
-  // Ejecutamos cada sentencia por separado.
-  const statements = cleaned
+  // 2) Separamos por ';' y descartamos CREATE DATABASE / USE (la base ya existe).
+  const statements = noComments
     .split(';')
     .map((s) => s.trim())
-    .filter((s) => s && !s.startsWith('--'));
+    .filter((s) => s && !/^(CREATE\s+DATABASE|USE)\b/i.test(s));
 
   for (const stmt of statements) {
     try {
