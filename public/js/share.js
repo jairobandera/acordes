@@ -76,6 +76,46 @@ function accentLabel(m) {
   return m === 'none' ? 'sin acento' : m === 'all' ? 'acento en todos' : 'acento 1er golpe';
 }
 
+// Caja para guardar la lista compartida en la cuenta propia.
+function renderImport(data) {
+  const box = el('div', 'share-import');
+  const authToken = localStorage.getItem('acordes_token');
+
+  if (!authToken) {
+    const a = el('a', 'btn btn-secondary', 'Iniciá sesión para guardarla en tus listas');
+    a.href = '/';
+    box.appendChild(a);
+    return box;
+  }
+
+  const btn = el('button', 'btn btn-primary', '➕ Guardar en mis listas');
+  btn.onclick = async () => {
+    btn.disabled = true;
+    btn.textContent = 'Guardando…';
+    try {
+      const r = await fetch(`/api/shared/${encodeURIComponent(token)}/import`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'No se pudo guardar.');
+      box.innerHTML = '';
+      box.appendChild(el('span', 'share-import-ok', `✓ Guardada como “${d.name}”. `));
+      const a = el('a', 'btn-link', 'Ver en Mis listas ›');
+      a.href = '/';
+      box.appendChild(a);
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = '➕ Guardar en mis listas';
+      const msg = el('div', 'status error');
+      msg.textContent = e.message;
+      box.appendChild(msg);
+    }
+  };
+  box.appendChild(btn);
+  return box;
+}
+
 async function boot() {
   try {
     const res = await fetch(`/api/shared/${encodeURIComponent(token)}`);
@@ -88,6 +128,7 @@ async function boot() {
     $('#plOwner').textContent = `Lista compartida por ${data.owner} · ${data.songs.length} canción(es)`;
 
     const list = $('#songList');
+    list.before(renderImport(data));
     if (!data.songs.length) {
       list.appendChild(el('div', 'empty', 'Esta lista no tiene canciones.'));
       return;
