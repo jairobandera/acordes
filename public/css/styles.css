@@ -392,7 +392,12 @@ html, body { overflow-x: hidden; max-width: 100%; }
   .metro-opt { font-size: 12px; }
 
   /* Hoja de acordes: más chica y scrollea adentro, no estira la página */
-  .chord-sheet { font-size: 12px; padding: 10px 12px; max-width: 100%; }
+  .chord-sheet { font-size: 11px; line-height: 1.45; padding: 10px 11px; max-width: 100%; }
+}
+
+/* Teléfonos chicos: un poco más chica aún para que entren más notas */
+@media (max-width: 400px) {
+  .chord-sheet { font-size: 10.5px; }
 
   /* Tarjetas en una sola columna */
   .card-grid { grid-template-columns: 1fr; }

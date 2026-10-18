@@ -48,7 +48,10 @@ const state = {
   current: null,      // canción en el visor { title, artist, versions, ... }
   versionIndex: 0,
   transpose: 0,
-  fontSize: 15,
+  // Tamaño inicial de la hoja de acordes: más chico en celular para que entren
+  // más notas sin desbordar (el usuario igual lo ajusta con A- / A+).
+  fontSize: window.matchMedia('(max-width: 400px)').matches ? 11
+          : window.matchMedia('(max-width: 560px)').matches ? 12 : 15,
   savedSongId: null,  // id en DB si está guardada
   metronome: new Metronome(),
 };
@@ -142,7 +145,10 @@ function switchView(name) {
   if (name === 'admin') loadAdmin();
 }
 
-$$('.nav-item').forEach((n) => { n.onclick = () => switchView(n.dataset.view); });
+$$('.nav-item').forEach((n) => {
+  if (!n.dataset.view) return; // botones sin vista (ej. instalar) tienen su propio handler
+  n.onclick = () => switchView(n.dataset.view);
+});
 
 // Sidebar mobile
 function openSidebar() { $('#sidebar').classList.add('open'); $('#backdrop').classList.remove('hidden'); }
@@ -794,6 +800,70 @@ function closeModal() {
   $('#modalCancel').onclick = null;
   $('#modalOk').style.display = '';
 }
+
+// ----------------------- PWA / Acceso directo -----------------------
+// Registramos el service worker (necesario para que se pueda "instalar").
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
+// Capturamos el evento de instalación (Chrome/Android/escritorio).
+let deferredInstall = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstall = e;
+});
+window.addEventListener('appinstalled', () => {
+  deferredInstall = null;
+  toast('¡Acceso directo creado! ✓', 'ok');
+});
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+$('#installBtn').onclick = async () => {
+  closeSidebar();
+  if (isStandalone()) {
+    toast('Ya estás usando la app instalada 🎵', 'ok');
+    return;
+  }
+  // Camino ideal: el navegador soporta instalación directa.
+  if (deferredInstall) {
+    deferredInstall.prompt();
+    try { await deferredInstall.userChoice; } catch { /* noop */ }
+    deferredInstall = null;
+    return;
+  }
+  // Fallback: instrucciones (iPhone/Safari o navegadores sin prompt).
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  $('#modalTitle').textContent = 'Crear acceso directo';
+  $('#modalBody').innerHTML = isIOS
+    ? `<p>En iPhone/iPad:</p>
+       <ol style="padding-left:18px; line-height:1.9">
+         <li>Tocá el botón <b>Compartir</b> (el cuadrito con la flecha ↑).</li>
+         <li>Elegí <b>“Agregar a inicio”</b>.</li>
+         <li>Tocá <b>Agregar</b>. ¡Listo, queda el ícono en tu pantalla!</li>
+       </ol>`
+    : `<p>Para crear el acceso directo:</p>
+       <ol style="padding-left:18px; line-height:1.9">
+         <li>Abrí el menú del navegador (los <b>⋮</b> arriba a la derecha).</li>
+         <li>Elegí <b>“Instalar app”</b> o <b>“Agregar a pantalla de inicio”</b>.</li>
+         <li>Confirmá. Queda el ícono 🎵 en tu escritorio/celular.</li>
+       </ol>
+       <p class="status" style="margin-top:8px">Si no te aparece la opción, recargá la página e intentá de nuevo.</p>`;
+  $('#modalOk').style.display = 'none';
+  $('#modal').classList.remove('hidden');
+  $('#modalCancel').textContent = 'Entendido';
+  $('#modalCancel').onclick = () => {
+    $('#modal').classList.add('hidden');
+    $('#modalOk').style.display = '';
+    $('#modalCancel').textContent = 'Cancelar';
+    $('#modalCancel').onclick = null;
+  };
+};
 
 // ----------------------- Arranque -----------------------
 async function boot() {

@@ -13,16 +13,36 @@ function fetchT(url, opts = {}, ms = 20000) {
 }
 
 // Devuelve { html, finalUrl } usando el scraper nativo.
+// Mandamos headers de navegador completos: ayuda con sitios que filtran por
+// headers (cifraclub tiene protección anti-bot fuerte).
 export async function fetchHtml(url) {
+  let origin = '';
+  try { origin = new URL(url).origin; } catch { /* noop */ }
+
   const res = await fetchT(url, {
     headers: {
       'User-Agent': UA,
-      Accept: 'text/html,application/xhtml+xml',
-      'Accept-Language': 'es-ES,es;q=0.9',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+      'Upgrade-Insecure-Requests': '1',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'sec-ch-ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': '"Windows"',
+      ...(origin ? { Referer: origin + '/' } : {}),
     },
     redirect: 'follow',
   });
-  if (!res.ok) throw new Error(`La página respondió ${res.status}`);
+  if (!res.ok) {
+    // cifraclub suele bloquear IPs de servidor (Cloudflare) con 403.
+    if (res.status === 403 && /cifraclub/i.test(url)) {
+      throw new Error('Cifraclub bloqueó el pedido (su protección anti-bot a veces bloquea servidores). Probá la misma canción en lacuerda.net.');
+    }
+    throw new Error(`La página respondió ${res.status}.`);
+  }
   const html = await res.text();
   return { html, finalUrl: res.url || url, via: 'native' };
 }
