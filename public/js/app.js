@@ -833,19 +833,41 @@ function isStandalone() {
 let backGuardReady = false;
 let exitingApp = false;
 
+// Hace lo mismo que el botón "Volver" según dónde estés.
+// Devuelve true si navegó a algún lado, false si ya estás en el home (hay que salir).
+function goBack() {
+  // Visor de canción -> vuelve a donde se abrió (como el botón Volver)
+  if (state.currentView === 'song') {
+    state.metronome.stop();
+    setMetroButton(false);
+    switchView(state.savedSongId ? 'library' : 'search');
+    return true;
+  }
+  // Detalle de una lista -> vuelve al listado de listas
+  if (state.currentView === 'playlists' && !$('#playlistDetail').classList.contains('hidden')) {
+    loadPlaylists();
+    return true;
+  }
+  // Detalle de un usuario (admin) -> vuelve al listado de usuarios
+  if (state.currentView === 'admin' && !$('#adminUserDetail').classList.contains('hidden')) {
+    loadAdmin();
+    return true;
+  }
+  // Vista principal que no es el home -> va al home (búsqueda)
+  const home = landingView();
+  if (state.currentView && state.currentView !== home) {
+    switchView(home);
+    return true;
+  }
+  return false; // ya estás en el home
+}
+
 function onAppPopState() {
   if (exitingApp) return; // estamos saliendo a propósito: dejar cerrar
   if (!state.user) { history.pushState({ g: 1 }, ''); return; }
-  const home = landingView();
-  if (state.currentView && state.currentView !== home) {
-    // Volver a la búsqueda (página principal) sin cerrar la app
-    switchView(home);
-    history.pushState({ g: 1 }, '');
-  } else {
-    // Ya en la búsqueda: re-armamos la trampa y preguntamos si quiere salir
-    history.pushState({ g: 1 }, '');
-    askExitApp();
-  }
+  const navigated = goBack();
+  history.pushState({ g: 1 }, ''); // re-armamos la trampa para no cerrar
+  if (!navigated) askExitApp(); // estabas en la búsqueda -> preguntar si salir
 }
 
 function setupBackGuard() {
