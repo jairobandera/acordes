@@ -73,6 +73,7 @@ function showApp() {
     const btn = document.querySelector(`.nav-item[data-view="${v}"]`);
     if (btn) btn.classList.toggle('hidden', isAdmin);
   });
+  setupBackGuard(); // manejo del "atrás" en la app instalada
 }
 
 // Vista inicial según el rol.
@@ -135,6 +136,7 @@ $('#logoutBtn').onclick = () => {
 
 // ----------------------- Navegación -----------------------
 function switchView(name) {
+  state.currentView = name;
   $$('.nav-item').forEach((n) => n.classList.toggle('active', n.dataset.view === name));
   $$('.view').forEach((v) => v.classList.add('hidden'));
   $(`#view-${name}`).classList.remove('hidden');
@@ -822,6 +824,58 @@ window.addEventListener('appinstalled', () => {
 
 function isStandalone() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+// --- Botón/gesto "atrás" en la app instalada ---------------------------------
+// En modo standalone, el "atrás" (gesto o botón) normalmente cerraría la app.
+// Lo interceptamos: si no estás en la búsqueda, te lleva a la búsqueda; si ya
+// estás en la búsqueda, muestra un cartel "¿Salir de la aplicación?".
+let backGuardReady = false;
+let exitingApp = false;
+
+function onAppPopState() {
+  if (exitingApp) return; // estamos saliendo a propósito: dejar cerrar
+  if (!state.user) { history.pushState({ g: 1 }, ''); return; }
+  const home = landingView();
+  if (state.currentView && state.currentView !== home) {
+    // Volver a la búsqueda (página principal) sin cerrar la app
+    switchView(home);
+    history.pushState({ g: 1 }, '');
+  } else {
+    // Ya en la búsqueda: re-armamos la trampa y preguntamos si quiere salir
+    history.pushState({ g: 1 }, '');
+    askExitApp();
+  }
+}
+
+function setupBackGuard() {
+  if (!isStandalone() || backGuardReady) return;
+  backGuardReady = true;
+  history.pushState({ g: 1 }, '');
+  window.addEventListener('popstate', onAppPopState);
+}
+
+function askExitApp() {
+  if (!$('#modal').classList.contains('hidden')) return; // ya hay un modal abierto
+  $('#modalTitle').textContent = 'Salir de la aplicación';
+  $('#modalBody').innerHTML = '<p>¿Querés salir de la aplicación?</p>';
+  $('#modalOk').textContent = 'Salir';
+  $('#modal').classList.remove('hidden');
+  const cleanup = () => {
+    $('#modal').classList.add('hidden');
+    $('#modalOk').textContent = 'Aceptar';
+    $('#modalOk').onclick = null;
+    $('#modalCancel').onclick = null;
+  };
+  $('#modalCancel').onclick = cleanup; // Cancelar: nos quedamos (trampa ya re-armada)
+  $('#modalOk').onclick = () => {
+    cleanup();
+    // Salir de verdad: dejamos de atrapar y retrocedemos más allá de la entrada.
+    exitingApp = true;
+    window.removeEventListener('popstate', onAppPopState);
+    history.go(-2);
+    setTimeout(() => { try { window.close(); } catch { /* noop */ } }, 150);
+  };
 }
 
 $('#installBtn').onclick = async () => {
