@@ -2,7 +2,7 @@
 import { api, getToken, setToken } from './api.js';
 import { transposeChord, keyAfterTranspose, detectKey } from './transpose.js';
 import { Metronome } from './metronome.js';
-import { loadChordDB, showChordPopover } from './chord-diagram.js';
+import { loadChordDB, showChordPopover, chordDiagramHTML } from './chord-diagram.js';
 
 // ----------------------- Helpers DOM -----------------------
 const $ = (sel) => document.querySelector(sel);
@@ -219,6 +219,7 @@ function loadSongIntoViewer(song, { savedId = null } = {}) {
   state.current = song;
   state.savedSongId = savedId;
   state.versionIndex = 0;
+  state.editMode = false; // siempre arranca sin modo edición
 
   // Config inicial desde lo guardado (si viene de DB) o por defecto
   state.transpose = Number.isInteger(song.transpose) ? song.transpose : 0;
@@ -271,8 +272,13 @@ function renderSheet() {
       if (seg.c) {
         const shown = transposeChord(seg.t, state.transpose, preferFlats);
         const sp = el('span', 'chord clickable', shown);
-        sp.title = 'Ver acorde';
-        sp.onclick = (ev) => { ev.stopPropagation(); showChordPopover(shown.trim(), sp); };
+        if (state.editMode) sp.classList.add('editing');
+        sp.title = state.editMode ? 'Tocá para cambiar este acorde' : 'Ver acorde';
+        sp.onclick = (ev) => {
+          ev.stopPropagation();
+          if (state.editMode) openChordEditor(seg, sp);
+          else showChordPopover(shown.trim(), sp);
+        };
         line.appendChild(sp);
       } else {
         line.appendChild(document.createTextNode(seg.t));
@@ -304,10 +310,17 @@ $('#backBtn').onclick = () => {
   switchView(state.savedSongId ? 'library' : 'search');
 };
 
-// Acciones (guardar / agregar a lista / borrar)
+// Acciones (editar / guardar / agregar a lista / borrar)
 function renderSongActions() {
   const box = $('#songActions');
   box.innerHTML = '';
+
+  // Botón editar acordes (toggle)
+  const editBtn = el('button', 'btn btn-secondary' + (state.editMode ? ' editing-on' : ''),
+    state.editMode ? '✓ Listo' : '✏️ Editar');
+  editBtn.onclick = toggleEditMode;
+  box.append(editBtn);
+
   if (state.savedSongId) {
     const addBtn = el('button', 'btn btn-secondary', '+ A una lista');
     addBtn.onclick = addCurrentToPlaylist;
@@ -319,6 +332,98 @@ function renderSongActions() {
     saveBtn.onclick = saveCurrent;
     box.append(saveBtn);
   }
+}
+
+function toggleEditMode() {
+  state.editMode = !state.editMode;
+  renderSongActions();
+  renderSheet();
+  if (state.editMode) toast('Tocá un acorde para cambiarlo', 'ok');
+}
+
+// Guarda el contenido editado si la canción ya está guardada (debounce).
+let editSaveTimer = null;
+function persistEditedContent() {
+  if (!state.savedSongId) return;
+  clearTimeout(editSaveTimer);
+  editSaveTimer = setTimeout(async () => {
+    try {
+      await api.updateSong(state.savedSongId, { content: state.current.versions });
+    } catch { /* silencioso */ }
+  }, 400);
+}
+
+// Editor de un acorde: cambia la nota/alteración/tipo sin mover la posición.
+const CHORD_RE = /^(Sol|Do|Re|Mi|Fa|La|Si|[A-G])([#b]?)(.*)$/i;
+function openChordEditor(seg, span) {
+  const displayed = transposeChord(seg.t, state.transpose).trim();
+  const m = displayed.match(CHORD_RE) || [];
+  const esRoots = ['Do', 'Re', 'Mi', 'Fa', 'Sol', 'La', 'Si'];
+  const isEs = esRoots.some((r) => (m[1] || '').toLowerCase() === r.toLowerCase());
+  const roots = isEs ? esRoots : ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+
+  let curRoot = m[1] || roots[0];
+  let curAcc = m[2] || '';
+  let suffix = m[3] || '';
+
+  const quick = [
+    ['Mayor', ''], ['menor', 'm'], ['7', '7'], ['m7', 'm7'], ['Maj7', 'maj7'],
+    ['sus4', 'sus4'], ['sus2', 'sus2'], ['dim', 'dim'], ['aug', 'aug'], ['6', '6'], ['9', '9'],
+  ];
+
+  $('#modalTitle').textContent = 'Cambiar acorde';
+  $('#modalBody').innerHTML = `
+    <div class="chord-editor">
+      <div class="ce-label">Nota</div>
+      <div class="ce-row" id="ceRoots"></div>
+      <div class="ce-label">Alteración</div>
+      <div class="ce-row" id="ceAcc"></div>
+      <div class="ce-label">Tipo</div>
+      <div class="ce-row" id="ceType"></div>
+      <input type="text" id="ceSuffix" class="ce-suffix" placeholder="otro (ej: add9, /G)" value="${suffix}">
+      <div class="ce-preview" id="cePreview"></div>
+    </div>`;
+  $('#modalOk').textContent = 'Guardar';
+  $('#modalOk').style.display = '';
+  $('#modal').classList.remove('hidden');
+
+  const result = () => curRoot + curAcc + ($('#ceSuffix').value.trim());
+  const preview = () => { $('#cePreview').innerHTML = chordDiagramHTML(result()); };
+
+  const mkRow = (host, items, isActive, onPick) => {
+    host.innerHTML = '';
+    items.forEach(([label, val]) => {
+      const b = el('button', 'ce-btn' + (isActive(val) ? ' active' : ''), label);
+      b.type = 'button';
+      b.onclick = () => { onPick(val); };
+      host.appendChild(b);
+    });
+  };
+  const redraw = () => {
+    mkRow($('#ceRoots'), roots.map((r) => [r, r]), (v) => v === curRoot, (v) => { curRoot = v; redraw(); preview(); });
+    mkRow($('#ceAcc'), [['♮', ''], ['♯', '#'], ['♭', 'b']], (v) => v === curAcc, (v) => { curAcc = v; redraw(); preview(); });
+    mkRow($('#ceType'), quick, (v) => v === $('#ceSuffix').value.trim(), (v) => { $('#ceSuffix').value = v; redraw(); preview(); });
+  };
+  redraw();
+  preview();
+  $('#ceSuffix').oninput = () => { redraw(); preview(); };
+
+  const cleanup = () => {
+    $('#modal').classList.add('hidden');
+    $('#modalOk').onclick = null;
+    $('#modalCancel').onclick = null;
+  };
+  $('#modalCancel').onclick = cleanup;
+  $('#modalOk').onclick = () => {
+    const nuevo = result().trim();
+    if (!nuevo || !CHORD_RE.test(nuevo)) { toast('Acorde inválido', 'err'); return; }
+    // Guardamos en la notación original (deshaciendo la transposición actual)
+    seg.t = state.transpose ? transposeChord(nuevo, -state.transpose) : nuevo;
+    cleanup();
+    renderSheet();
+    persistEditedContent();
+    toast('Acorde cambiado ✓', 'ok');
+  };
 }
 
 async function saveCurrent() {
