@@ -6,47 +6,44 @@ import { signToken, requireAuth } from '../auth.js';
 
 const router = Router();
 
-// POST /api/auth/register  { username, email, password }
+// POST /api/auth/register  { username, password }
 router.post('/register', async (req, res) => {
-  const { username, email, password } = req.body || {};
-  if (!username || !email || !password) {
-    return res.status(400).json({ error: 'Faltan datos (usuario, email y contraseña).' });
+  const { username, password } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Faltan datos (usuario y contraseña).' });
   }
   if (String(password).length < 6) {
     return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
-  }
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-    return res.status(400).json({ error: 'Email inválido.' });
   }
 
   try {
     const hash = await bcrypt.hash(String(password), 10);
     const [result] = await pool.query(
-      'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)',
-      [username.trim(), email.trim().toLowerCase(), hash]
+      'INSERT INTO users (username, password_hash) VALUES (?, ?)',
+      [username.trim(), hash]
     );
     const user = { id: result.insertId, username: username.trim(), role: 'musico' };
     const token = signToken(user);
     res.status(201).json({ token, user });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ error: 'Ese usuario o email ya está registrado.' });
+      return res.status(409).json({ error: 'Ya existe un usuario con ese nombre. Elegí otro.' });
     }
     console.error(err);
     res.status(500).json({ error: 'Error al registrar.' });
   }
 });
 
-// POST /api/auth/login  { usernameOrEmail, password }
+// POST /api/auth/login  { username, password }
 router.post('/login', async (req, res) => {
-  const { usernameOrEmail, password } = req.body || {};
-  if (!usernameOrEmail || !password) {
+  const { username, password } = req.body || {};
+  if (!username || !password) {
     return res.status(400).json({ error: 'Faltan datos.' });
   }
   try {
     const [rows] = await pool.query(
-      'SELECT id, username, password_hash, role, is_active FROM users WHERE username = ? OR email = ? LIMIT 1',
-      [usernameOrEmail.trim(), usernameOrEmail.trim().toLowerCase()]
+      'SELECT id, username, password_hash, role, is_active FROM users WHERE username = ? LIMIT 1',
+      [username.trim()]
     );
     const u = rows[0];
     if (!u) return res.status(401).json({ error: 'Usuario o contraseña incorrectos.' });

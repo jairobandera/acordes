@@ -97,7 +97,7 @@ $('#loginForm').onsubmit = async (e) => {
   const fd = new FormData(e.target);
   try {
     const { token, user } = await api.login({
-      usernameOrEmail: fd.get('usernameOrEmail'),
+      username: fd.get('username'),
       password: fd.get('password'),
     });
     setToken(token);
@@ -115,7 +115,6 @@ $('#registerForm').onsubmit = async (e) => {
   try {
     const { token, user } = await api.register({
       username: fd.get('username'),
-      email: fd.get('email'),
       password: fd.get('password'),
     });
     setToken(token);
@@ -686,7 +685,7 @@ async function loadAdmin() {
       if (u.role === 'admin') nameLine.appendChild(el('span', 'badge key', 'admin'));
       if (!u.is_active) nameLine.appendChild(el('span', 'badge', 'deshabilitado'));
       info.appendChild(nameLine);
-      info.appendChild(el('div', 'au-sub', `${u.email} · ${u.song_count} canción(es) · ${u.playlist_count} lista(s)`));
+      info.appendChild(el('div', 'au-sub', `${u.song_count} canción(es) · ${u.playlist_count} lista(s)`));
       row.appendChild(info);
 
       const actions = el('div', 'au-actions');
@@ -725,7 +724,7 @@ async function openUserDetail(id) {
     box.appendChild(back);
 
     box.appendChild(el('h3', 'view-title', data.user.username));
-    box.appendChild(el('p', 'song-artist', `${data.user.email} · ${data.user.role}${data.user.is_active ? '' : ' · deshabilitado'}`));
+    box.appendChild(el('p', 'song-artist', `${data.user.role}${data.user.is_active ? '' : ' · deshabilitado'}`));
 
     box.appendChild(el('h4', 'subhead', `Listas (${data.playlists.length})`));
     if (data.playlists.length) {
@@ -766,7 +765,6 @@ $('#newUserBtn').onclick = () => {
   $('#modalBody').innerHTML = `
     <div class="form-col">
       <input type="text" id="nuUser" placeholder="Usuario">
-      <input type="email" id="nuEmail" placeholder="Email">
       <input type="password" id="nuPass" placeholder="Contraseña (mín. 6)">
       <label class="metro-opt">Rol
         <select id="nuRole" class="select select-sm">
@@ -783,7 +781,6 @@ $('#newUserBtn').onclick = () => {
     try {
       await api.adminCreateUser({
         username: $('#nuUser').value.trim(),
-        email: $('#nuEmail').value.trim(),
         password: $('#nuPass').value,
         role: $('#nuRole').value,
       });

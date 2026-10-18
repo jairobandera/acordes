@@ -10,7 +10,7 @@ router.use(requireAuth, requireAdmin);
 // GET /api/admin/users -> todos los usuarios con conteos
 router.get('/users', async (req, res) => {
   const [rows] = await pool.query(`
-    SELECT u.id, u.username, u.email, u.role, u.is_active, u.created_at,
+    SELECT u.id, u.username, u.role, u.is_active, u.created_at,
            (SELECT COUNT(*) FROM songs s WHERE s.user_id = u.id) AS song_count,
            (SELECT COUNT(*) FROM playlists p WHERE p.user_id = u.id) AS playlist_count
     FROM users u
@@ -22,7 +22,7 @@ router.get('/users', async (req, res) => {
 // GET /api/admin/users/:id -> detalle con listas y canciones
 router.get('/users/:id', async (req, res) => {
   const [users] = await pool.query(
-    'SELECT id, username, email, role, is_active, created_at FROM users WHERE id = ? LIMIT 1',
+    'SELECT id, username, role, is_active, created_at FROM users WHERE id = ? LIMIT 1',
     [req.params.id]
   );
   if (!users[0]) return res.status(404).json({ error: 'Usuario no encontrado.' });
@@ -47,9 +47,9 @@ router.get('/users/:id', async (req, res) => {
 
 // POST /api/admin/users -> crear usuario
 router.post('/users', async (req, res) => {
-  const { username, email, password, role } = req.body || {};
-  if (!username || !email || !password) {
-    return res.status(400).json({ error: 'Faltan datos (usuario, email, contraseña).' });
+  const { username, password, role } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Faltan datos (usuario y contraseña).' });
   }
   if (String(password).length < 6) {
     return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
@@ -58,13 +58,13 @@ router.post('/users', async (req, res) => {
   try {
     const hash = await bcrypt.hash(String(password), 10);
     const [r] = await pool.query(
-      'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
-      [username.trim(), email.trim().toLowerCase(), hash, finalRole]
+      'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
+      [username.trim(), hash, finalRole]
     );
-    res.status(201).json({ id: r.insertId, username: username.trim(), email, role: finalRole, is_active: 1 });
+    res.status(201).json({ id: r.insertId, username: username.trim(), role: finalRole, is_active: 1 });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ error: 'Ese usuario o email ya existe.' });
+      return res.status(409).json({ error: 'Ya existe un usuario con ese nombre.' });
     }
     throw err;
   }
