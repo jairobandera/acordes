@@ -54,7 +54,7 @@ router.post('/', async (req, res) => {
   const name = (req.body?.name || '').toString().trim();
   if (!name) return res.status(400).json({ error: 'Falta el nombre de la lista.' });
   const [result] = await pool.query(
-    'INSERT INTO playlists (user_id, name) VALUES (?, ?)',
+    'INSERT INTO playlists (user_id, name) VALUES (?, ?) RETURNING id',
     [req.user.id, name]
   );
   res.status(201).json({ id: result.insertId, name, song_count: 0 });
@@ -97,7 +97,7 @@ router.post('/:id/songs', async (req, res) => {
     return res.status(404).json({ error: 'Lista o canción no encontrada.' });
   }
   const [[{ maxPos }]] = await pool.query(
-    'SELECT COALESCE(MAX(position), -1) AS maxPos FROM playlist_songs WHERE playlist_id = ?',
+    'SELECT COALESCE(MAX(position), -1) AS "maxPos" FROM playlist_songs WHERE playlist_id = ?',
     [req.params.id]
   );
   try {
@@ -106,7 +106,7 @@ router.post('/:id/songs', async (req, res) => {
       [req.params.id, songId, maxPos + 1]
     );
   } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') {
+    if (err.code === '23505' || err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ error: 'La canción ya está en la lista.' });
     }
     throw err;

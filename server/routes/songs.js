@@ -88,7 +88,7 @@ router.post('/', async (req, res) => {
   const [result] = await pool.query(
     `INSERT INTO songs
       (user_id, title, artist, source_url, content_json, original_key, transpose, bpm, beats_per_bar, accent_mode)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
     [req.user.id, data.title, data.artist, data.source_url, data.content_json,
      data.original_key, data.transpose, data.bpm, data.beats_per_bar, data.accent_mode]
   );

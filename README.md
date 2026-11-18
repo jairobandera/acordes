@@ -9,7 +9,7 @@ App web para **buscar, scrapear, transponer y organizar** acordes de [lacuerda.n
 - 🎚️ **Transponer** de a medio tono (subir/bajar tonalidad) y **guardar la tonalidad**.
 - 🔁 **Varias versiones** por canción (las que ofrece lacuerda).
 - 👤 **Registro e inicio de sesión** (contraseñas hasheadas con bcrypt, sesión con JWT).
-- 💾 **Guardar canciones** por usuario (MySQL).
+- 💾 **Guardar canciones** por usuario (PostgreSQL / Supabase).
 - 📂 **Listas de canciones** (setlists), con agregar/quitar y reordenar.
 - 🥁 **Metrónomo** por canción con BPM, compás (2/4, 3/4, 4/4, 5/4, 6/8, 7/8), **TAP tempo** y acento configurable: *primer golpe*, *todos* o *sin acento*.
 - 🔗 **Compartir listas** por link (y botón de **WhatsApp**) con todas las canciones, su tonalidad y BPM. La página compartida es pública y de solo lectura, sin login.
@@ -22,7 +22,7 @@ App web para **buscar, scrapear, transponer y organizar** acordes de [lacuerda.n
 
 - **Frontend:** HTML + CSS + JavaScript nativo (sin frameworks).
 - **Backend:** Node.js + Express.
-- **Base de datos:** MySQL (pensado para XAMPP por defecto).
+- **Base de datos:** PostgreSQL (Supabase). Todo vive en un schema `acordes` aislado.
 - **Scraper:** nativo (fetch + cheerio), gratis y sin API keys. Funciona para lacuerda.net y cifraclub.com.
 
 ---
@@ -31,7 +31,7 @@ App web para **buscar, scrapear, transponer y organizar** acordes de [lacuerda.n
 
 ### 1. Requisitos
 - [Node.js](https://nodejs.org) 18 o superior (probado con v24).
-- **XAMPP** con **MySQL** corriendo (panel de XAMPP → botón *Start* en MySQL).
+- Un proyecto de **Supabase** (PostgreSQL). La app corre contra Supabase también en local.
 
 ### 2. Instalar dependencias
 ```bash
@@ -39,28 +39,22 @@ npm install
 ```
 
 ### 3. Configurar variables de entorno
-Ya hay un archivo `.env` listo con los valores por defecto de XAMPP
-(`root` sin contraseña en `localhost:3306`). Si tu MySQL tiene otra config,
-editá `.env` (tenés el ejemplo en `.env.example`).
+Copiá `.env.example` a `.env` y pegá tu **connection string de Supabase** en `DATABASE_URL`
+(pestaña **Connection pooling** del dashboard). Dejá `DB_SCHEMA=acordes` y `DB_SSL=true`.
 
-### 4. Crear la base de datos y las tablas
-Con MySQL de XAMPP encendido:
+### 4. Crear el schema y las tablas
 ```bash
 npm run init-db
 ```
-Esto crea la base `acordes` y todas las tablas.
-> Alternativa: abrí **phpMyAdmin** e importá/ejecutá el archivo `server/db/schema.sql`.
-
-> **¿Ya tenías la base de una versión anterior?** Corré la migración (agrega roles, compartir, etc. sin borrar datos):
-> ```bash
-> npm run migrate
-> ```
+Crea el schema **`acordes`** y todas las tablas (no toca el schema `public`).
+También se crean solas al arrancar el server.
 
 ### 4b. Crear el usuario administrador
 ```bash
 npm run create-admin
 ```
-Crea la cuenta **admin / 123456**. (Podés pasar otros datos: `npm run create-admin usuario clave email`.)
+Crea la cuenta **admin / 123456**. (Podés pasar otros datos: `npm run create-admin usuario clave`.)
+> O ponés `ADMIN_USERNAME` / `ADMIN_PASSWORD` en el `.env` y se crea solo al arrancar.
 
 ### 5. Arrancar el servidor
 ```bash
@@ -101,7 +95,7 @@ Acordes/
 │   ├── index.js            # Servidor Express + sirve el frontend
 │   ├── auth.js             # JWT + middleware
 │   ├── db/
-│   │   ├── pool.js         # Pool MySQL
+│   │   ├── pool.js         # Pool PostgreSQL (schema acordes) + wrapper
 │   │   ├── schema.sql      # Esquema de la base
 │   │   └── initdb.js       # Crea base y tablas
 │   ├── routes/             # auth, search, songs, playlists

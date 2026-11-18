@@ -58,12 +58,12 @@ router.post('/users', async (req, res) => {
   try {
     const hash = await bcrypt.hash(String(password), 10);
     const [r] = await pool.query(
-      'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
+      'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?) RETURNING id',
       [username.trim(), hash, finalRole]
     );
     res.status(201).json({ id: r.insertId, username: username.trim(), role: finalRole, is_active: 1 });
   } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') {
+    if (err.code === '23505' || err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ error: 'Ya existe un usuario con ese nombre.' });
     }
     throw err;

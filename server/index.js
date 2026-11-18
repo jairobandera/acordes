@@ -49,13 +49,13 @@ app.get(/^(?!\/api).*/, (req, res) => {
 async function start() {
   try {
     await assertDbConnection();
-    console.log('✓ Conectado a MySQL.');
-    // Auto-crea las tablas (y el admin desde env) si hace falta.
+    console.log('✓ Conectado a Postgres.');
+    // Auto-crea el schema/tablas (y el admin desde env) si hace falta.
     await ensureSchema();
     await ensureAdmin();
   } catch (err) {
-    console.error('✗ No se pudo conectar a MySQL:', err.message);
-    console.error('  Asegurate de que MySQL esté corriendo (en local: XAMPP).');
+    console.error('✗ No se pudo conectar a Postgres:', err.message);
+    console.error('  Revisá DATABASE_URL (Supabase) en el archivo .env');
   }
   app.listen(PORT, () => {
     console.log(`\n🎸 Acordes corriendo en  http://localhost:${PORT}\n`);

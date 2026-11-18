@@ -1,76 +1,66 @@
-# 🚀 Deploy en Render + Aiven (gratis, sin fecha de vencimiento)
+# 🚀 Deploy en Render + Supabase (gratis)
 
-Dos servicios, los dos con **plan gratis permanente** (no son trials):
+Dos servicios gratis:
 - **Render** → corre el servidor Node.
-- **Aiven** → base **MySQL** gratis.
+- **Supabase** → base **PostgreSQL**.
 
-El código se auto-configura: al arrancar **crea las tablas solo** y, si le pasás variables, **crea el admin solo**. No hace falta tocar la base a mano.
+La app crea sus tablas sola al arrancar, dentro de un **schema `acordes`** aislado
+(nunca toca el schema `public` ni otras apps del mismo proyecto Supabase).
 
-> **GitHub solo guarda el código**, no lo ejecuta. Por eso se usan Render + Aiven.
+> **GitHub solo guarda el código**, no lo ejecuta. Por eso se usan Render + Supabase.
 
 ---
 
-## Parte 1 — Base MySQL en Aiven
+## Parte 1 — Connection string de Supabase
 
-1. Entrá a **[aiven.io](https://aiven.io)** y creá una cuenta.
-2. **Create service** → **MySQL** → elegí el plan **Free** (dice "Free", sin tarjeta).
-3. Elegí una región cercana y creá el servicio. Esperá unos minutos a que diga **Running**.
-4. En la pantalla del servicio (**Overview / Connection information**) anotá:
-   - **Host** (algo como `mysql-xxxx.a.aivencloud.com`)
-   - **Port** (un número tipo `12345`, NO 3306)
-   - **User** (normalmente `avnadmin`)
-   - **Password**
-   - **Database name** (normalmente `defaultdb`)
+1. Entrá a tu proyecto en **[supabase.com](https://supabase.com)**.
+2. Arriba, tocá **Connect** (o **Project Settings → Database → Connection string**).
+3. Elegí la pestaña **Connection pooling** (Supavisor) — modo **Transaction**.
+   Copiá el string, que se ve así:
+   ```
+   postgresql://postgres.<ref>:[YOUR-PASSWORD]@aws-0-<region>.pooler.supabase.com:6543/postgres
+   ```
+4. Reemplazá `[YOUR-PASSWORD]` por la contraseña de la base (la que pusiste al crear el proyecto; si no la recordás, la reseteás en **Database → Reset database password**).
 
-> No hace falta crear tablas: la app las crea sola al arrancar.
+> Usá el **pooler** (`...pooler.supabase.com`), no la conexión directa, porque Render
+> necesita IPv4 y la directa de Supabase es solo IPv6.
 
 ---
 
 ## Parte 2 — Servidor en Render
 
-1. Entrá a **[render.com](https://render.com)** y entrá con tu **GitHub**.
-2. **New +** → **Web Service** → conectá el repo **`jairobandera/acordes`**.
-3. Render detecta Node (`npm install` + `npm start`). Dejá el plan **Free**.
-4. En **Environment / Environment Variables**, agregá estas (con los datos de Aiven del paso anterior):
+1. Entrá a **[render.com](https://render.com)** con tu **GitHub**.
+2. **New +** → **Web Service** → conectá el repo **`jairobandera/acordes`**. Plan **Free**.
+3. En **Environment / Environment Variables**, agregá:
 
 | Variable | Valor |
 |---|---|
-| `DB_HOST` | el Host de Aiven |
-| `DB_PORT` | el Port de Aiven (ej. `12345`) |
-| `DB_USER` | `avnadmin` |
-| `DB_PASSWORD` | la password de Aiven |
-| `DB_NAME` | `defaultdb` |
+| `DATABASE_URL` | el connection string del Paso 1 (con la password puesta) |
+| `DB_SCHEMA` | `acordes` |
 | `DB_SSL` | `true` |
 | `JWT_SECRET` | una cadena larga inventada |
 | `ADMIN_USERNAME` | `admin` |
 | `ADMIN_PASSWORD` | la clave que quieras para el admin |
-| `PUBLIC_URL` | (lo completás en el paso 6) |
+| `PUBLIC_URL` | (lo completás en el paso 5) |
 
-> `PORT` lo pone Render solo; la app ya lo respeta. `DB_SSL=true` es clave: Aiven exige conexión segura.
-
-5. **Create Web Service**. En los **Logs** deberías ver:
+4. **Create Web Service**. En los **Logs** deberías ver:
    ```
-   ✓ Conectado a MySQL.
+   ✓ Conectado a Postgres.
    ✓ Admin "admin" creado desde variables de entorno.
    🎸 Acordes corriendo en ...
    ```
-   (Las tablas y el admin se crean solos en este primer arranque.)
+   (El schema `acordes`, las tablas y el admin se crean solos.)
 
-6. Render te da una URL pública (ej. `https://acordes.onrender.com`). Copiala, volvé a
-   **Environment Variables** y ponela en **`PUBLIC_URL`** (para que los links de compartir salgan bien). Guardá → redeploya solo.
+5. Render te da una URL pública. Copiala, ponela en **`PUBLIC_URL`** y guardá (redeploya solo).
 
-7. ¡Listo! Entrá a tu URL, logueate con `admin` / tu clave, y a usar la app.
+6. Entrá a tu URL, logueate con `admin` / tu clave. ¡Listo!
 
 ---
 
 ## Notas
-
-- **Render free duerme** el servicio tras ~15 min sin uso: la primera visita después tarda ~30 seg en despertar. Es normal del plan gratis.
-- **Aiven free** es chico (~1GB) pero permanente y sobra para miles de canciones.
-- Si querés verificación SSL estricta: Aiven te da un **CA certificate** (botón de descarga en Connection info). Pegá su contenido en una variable `DB_SSL_CA` y el código lo usa.
-- Si ves `ER_ACCESS_DENIED` o timeouts: revisá que `DB_SSL=true` esté puesto y que host/puerto/clave sean los de Aiven.
-
----
-
-## Alternativa de base: TiDB Cloud o Clever Cloud
-Si preferís más espacio, **TiDB Cloud Serverless** (compatible MySQL, ~5GB gratis) también sirve — mismas variables, `DB_SSL=true`. **Clever Cloud** es otra opción (más chica pero simple).
+- **Aislamiento:** todas las tablas de Acordes viven en el schema **`acordes`**. Tu otra
+  app (en `public` u otro schema) no se toca.
+- **Render free** duerme tras ~15 min sin uso (la 1ª visita tarda ~30-50 s en despertar).
+- **Supabase free** es permanente; alcanza de sobra para esta app.
+- Si ves errores de conexión: revisá que `DATABASE_URL` tenga la password correcta y que
+  sea el string del **pooler** (puerto 6543).

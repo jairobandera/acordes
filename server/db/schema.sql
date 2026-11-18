@@ -1,72 +1,66 @@
--- Schema de la app Acordes
--- Se puede correr tal cual en phpMyAdmin (XAMPP) o con: npm run init-db
+-- Schema de la app Acordes (PostgreSQL / Supabase).
+-- TODO vive en el schema "acordes" para no tocar el schema public ni otra app.
 
-CREATE DATABASE IF NOT EXISTS acordes
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-
-USE acordes;
+CREATE SCHEMA IF NOT EXISTS acordes;
+SET search_path TO acordes;
 
 -- Usuarios
-CREATE TABLE IF NOT EXISTS users (
-  id            INT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS acordes.users (
+  id            SERIAL PRIMARY KEY,
   username      VARCHAR(50)  NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
-  -- 'musico' = usuario común, 'admin' = administrador (vos)
-  role          ENUM('musico','admin') NOT NULL DEFAULT 'musico',
+  -- 'musico' = usuario común, 'admin' = administrador
+  role          VARCHAR(10)  NOT NULL DEFAULT 'musico',
   -- 0 = cuenta deshabilitada (no puede loguear)
-  is_active     TINYINT(1) NOT NULL DEFAULT 1,
-  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  is_active     SMALLINT     NOT NULL DEFAULT 1,
+  created_at    TIMESTAMPTZ  DEFAULT now()
+);
 
 -- Canciones guardadas por cada usuario
-CREATE TABLE IF NOT EXISTS songs (
-  id            INT AUTO_INCREMENT PRIMARY KEY,
-  user_id       INT NOT NULL,
+CREATE TABLE IF NOT EXISTS acordes.songs (
+  id            SERIAL PRIMARY KEY,
+  user_id       INTEGER NOT NULL REFERENCES acordes.users(id) ON DELETE CASCADE,
   title         VARCHAR(255) NOT NULL,
   artist        VARCHAR(255) NOT NULL,
   source_url    VARCHAR(512),
-  -- Contenido parseado (lineas con segmentos acorde/texto) en JSON
-  content_json  LONGTEXT NOT NULL,
+  content_json  TEXT NOT NULL,
   original_key  VARCHAR(10),
-  -- Semitonos de transposicion guardados por el usuario (-11..11)
-  transpose     INT NOT NULL DEFAULT 0,
-  -- Metronomo
-  bpm           INT NOT NULL DEFAULT 100,
-  beats_per_bar INT NOT NULL DEFAULT 4,
-  -- 'first' = acento en primer golpe, 'none' = sin acento, 'all' = acento en todos
-  accent_mode   ENUM('first','none','all') NOT NULL DEFAULT 'first',
-  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_songs_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  transpose     INTEGER NOT NULL DEFAULT 0,
+  bpm           INTEGER NOT NULL DEFAULT 100,
+  beats_per_bar INTEGER NOT NULL DEFAULT 4,
+  -- 'first' = acento primer golpe, 'none' = sin acento, 'all' = todos
+  accent_mode   VARCHAR(10) NOT NULL DEFAULT 'first',
+  created_at    TIMESTAMPTZ DEFAULT now(),
+  updated_at    TIMESTAMPTZ DEFAULT now()
+);
 
 -- Listas de canciones (setlists)
-CREATE TABLE IF NOT EXISTS playlists (
-  id          INT AUTO_INCREMENT PRIMARY KEY,
-  user_id     INT NOT NULL,
+CREATE TABLE IF NOT EXISTS acordes.playlists (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES acordes.users(id) ON DELETE CASCADE,
   name        VARCHAR(255) NOT NULL,
-  -- Token para compartir la lista públicamente (NULL = no compartida)
-  share_token VARCHAR(32) NULL UNIQUE,
-  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_playlists_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  share_token VARCHAR(32) UNIQUE,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
 
 -- Relacion canciones <-> listas (con orden)
-CREATE TABLE IF NOT EXISTS playlist_songs (
-  id          INT AUTO_INCREMENT PRIMARY KEY,
-  playlist_id INT NOT NULL,
-  song_id     INT NOT NULL,
-  position    INT NOT NULL DEFAULT 0,
-  CONSTRAINT fk_ps_playlist FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
-  CONSTRAINT fk_ps_song     FOREIGN KEY (song_id)     REFERENCES songs(id)     ON DELETE CASCADE,
-  UNIQUE KEY uniq_playlist_song (playlist_id, song_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS acordes.playlist_songs (
+  id          SERIAL PRIMARY KEY,
+  playlist_id INTEGER NOT NULL REFERENCES acordes.playlists(id) ON DELETE CASCADE,
+  song_id     INTEGER NOT NULL REFERENCES acordes.songs(id)     ON DELETE CASCADE,
+  position    INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (playlist_id, song_id)
+);
 
--- Uso de las APIs de scraping (para el panel de administrador)
-CREATE TABLE IF NOT EXISTS api_usage (
-  provider     VARCHAR(20) PRIMARY KEY,
-  requests     INT NOT NULL DEFAULT 0,
-  failures     INT NOT NULL DEFAULT 0,
-  last_used_at TIMESTAMP NULL DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Mantiene updated_at al día en songs (equivale al ON UPDATE de MySQL)
+CREATE OR REPLACE FUNCTION acordes.set_updated_at() RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS songs_updated_at ON acordes.songs;
+CREATE TRIGGER songs_updated_at
+  BEFORE UPDATE ON acordes.songs
+  FOR EACH ROW EXECUTE FUNCTION acordes.set_updated_at();

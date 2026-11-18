@@ -19,14 +19,14 @@ router.post('/register', async (req, res) => {
   try {
     const hash = await bcrypt.hash(String(password), 10);
     const [result] = await pool.query(
-      'INSERT INTO users (username, password_hash) VALUES (?, ?)',
+      'INSERT INTO users (username, password_hash) VALUES (?, ?) RETURNING id',
       [username.trim(), hash]
     );
     const user = { id: result.insertId, username: username.trim(), role: 'musico' };
     const token = signToken(user);
     res.status(201).json({ token, user });
   } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') {
+    if (err.code === '23505' || err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ error: 'Ya existe un usuario con ese nombre. Elegí otro.' });
     }
     console.error(err);

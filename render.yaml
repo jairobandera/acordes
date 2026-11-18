@@ -1,6 +1,6 @@
 # Config para desplegar en Render (https://render.com) — plan gratuito.
-# Render corre el servidor Node. La base MySQL va en un proveedor aparte
-# (ver DEPLOY.md). Completá las variables de entorno en el panel de Render.
+# Render corre el servidor Node. La base es PostgreSQL en Supabase.
+# Completá las variables de entorno en el panel de Render.
 services:
   - type: web
     name: acordes
@@ -15,16 +15,10 @@ services:
         generateValue: true          # Render genera una clave segura
       - key: PUBLIC_URL
         sync: false                  # ej: https://acordes.onrender.com
-      - key: DB_HOST
-        sync: false
-      - key: DB_PORT
-        value: "3306"
-      - key: DB_USER
-        sync: false
-      - key: DB_PASSWORD
-        sync: false
-      - key: DB_NAME
-        sync: false
+      - key: DATABASE_URL
+        sync: false                  # connection string (pooler) de Supabase
+      - key: DB_SCHEMA
+        value: acordes
       - key: DB_SSL
         value: "true"
       - key: ADMIN_USERNAME

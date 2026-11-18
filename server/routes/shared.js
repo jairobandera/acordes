@@ -82,7 +82,7 @@ router.post('/:token/import', requireAuth, async (req, res) => {
   try {
     await conn.beginTransaction();
     const [plRes] = await conn.query(
-      'INSERT INTO playlists (user_id, name) VALUES (?, ?)',
+      'INSERT INTO playlists (user_id, name) VALUES (?, ?) RETURNING id',
       [req.user.id, newName]
     );
     const newPlaylistId = plRes.insertId;
@@ -91,7 +91,7 @@ router.post('/:token/import', requireAuth, async (req, res) => {
       const [sRes] = await conn.query(
         `INSERT INTO songs
           (user_id, title, artist, source_url, content_json, original_key, transpose, bpm, beats_per_bar, accent_mode)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
         [req.user.id, s.title, s.artist, s.source_url, s.content_json, s.original_key,
          s.transpose, s.bpm, s.beats_per_bar, s.accent_mode]
       );

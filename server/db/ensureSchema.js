@@ -1,6 +1,6 @@
-// Crea las tablas si no existen, usando la base ya conectada (no crea la base).
-// Se corre al arrancar el server, así en la nube (Railway, etc.) no hace falta
-// inicializar la base a mano. Es idempotente: CREATE TABLE IF NOT EXISTS.
+// Crea el schema "acordes" y sus tablas si no existen (idempotente).
+// Se corre al arrancar el server, así en la nube (Supabase) no hace falta
+// inicializar nada a mano. NUNCA toca el schema public ni otras apps.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -11,43 +11,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export async function ensureSchema() {
   const sql = readFileSync(join(__dirname, 'schema.sql'), 'utf8');
-
-  // 1) Sacamos las líneas de comentario (-- ...) ANTES de separar por ';',
-  //    si no, un comentario pegado a un CREATE TABLE se lleva la sentencia entera.
-  const noComments = sql
-    .split('\n')
-    .filter((line) => !/^\s*--/.test(line))
-    .join('\n');
-
-  // 2) Separamos por ';' y descartamos CREATE DATABASE / USE (la base ya existe).
-  const statements = noComments
-    .split(';')
-    .map((s) => s.trim())
-    .filter((s) => s && !/^(CREATE\s+DATABASE|USE)\b/i.test(s));
-
-  for (const stmt of statements) {
-    try {
-      await pool.query(stmt);
-    } catch (err) {
-      console.warn('[ensureSchema] aviso:', err.message);
-    }
-  }
-
-  // Migración: si una base vieja todavía tiene la columna email, la sacamos
-  // (al dropear la columna se va también su índice único).
+  // Postgres acepta todo el archivo (multi-sentencia, incluida la función $$) en
+  // una sola llamada. Es idempotente (IF NOT EXISTS / CREATE OR REPLACE).
   try {
-    const db = process.env.DB_NAME || 'acordes';
-    const [cols] = await pool.query(
-      `SELECT 1 FROM information_schema.COLUMNS
-       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'email' LIMIT 1`,
-      [db]
-    );
-    if (cols.length) {
-      await pool.query('ALTER TABLE users DROP COLUMN email');
-      console.log('✓ Columna email eliminada de users.');
-    }
+    await pool.exec(sql);
   } catch (err) {
-    console.warn('[ensureSchema] aviso al sacar email:', err.message);
+    console.warn('[ensureSchema] aviso:', err.message);
   }
 }
 
