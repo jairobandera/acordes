@@ -1,49 +1,32 @@
-# 🚀 Deploy en Render + Supabase (gratis)
+# 🚀 Deploy en el VPS (Coolify)
 
-Dos servicios gratis:
-- **Render** → corre el servidor Node.
-- **Supabase** → base **PostgreSQL**.
+La app corre en el VPS de **pckairos.cloud**, administrado con **[Coolify](https://coolify.io)**:
+- **App Node** → `https://acordes.pckairos.cloud`
+- **PostgreSQL** → en el mismo servidor, base `apps`
 
 La app crea sus tablas sola al arrancar, dentro de un **schema `acordes`** aislado
-(nunca toca el schema `public` ni otras apps del mismo proyecto Supabase).
-
-> **GitHub solo guarda el código**, no lo ejecuta. Por eso se usan Render + Supabase.
+(nunca toca el schema `public` ni los esquemas de otras apps de la misma base).
 
 ---
 
-## Parte 1 — Connection string de Supabase
+## Crear la app en Coolify
 
-1. Entrá a tu proyecto en **[supabase.com](https://supabase.com)**.
-2. Arriba, tocá **Connect** (o **Project Settings → Database → Connection string**).
-3. Elegí la pestaña **Connection pooling** (Supavisor) — modo **Transaction**.
-   Copiá el string, que se ve así:
-   ```
-   postgresql://postgres.<ref>:[YOUR-PASSWORD]@aws-0-<region>.pooler.supabase.com:6543/postgres
-   ```
-4. Reemplazá `[YOUR-PASSWORD]` por la contraseña de la base (la que pusiste al crear el proyecto; si no la recordás, la reseteás en **Database → Reset database password**).
-
-> Usá el **pooler** (`...pooler.supabase.com`), no la conexión directa, porque Render
-> necesita IPv4 y la directa de Supabase es solo IPv6.
-
----
-
-## Parte 2 — Servidor en Render
-
-1. Entrá a **[render.com](https://render.com)** con tu **GitHub**.
-2. **New +** → **Web Service** → conectá el repo **`jairobandera/acordes`**. Plan **Free**.
-3. En **Environment / Environment Variables**, agregá:
+1. Coolify → proyecto **pckairos** → **New resource → Public repository** → `https://github.com/jairobandera/acordes`, rama `main`.
+2. Build pack **Nixpacks**, puerto **3000**, dominio `https://acordes.pckairos.cloud`.
+3. En **Environment Variables**, agregá:
 
 | Variable | Valor |
 |---|---|
-| `DATABASE_URL` | el connection string del Paso 1 (con la password puesta) |
+| `DATABASE_URL` | `postgresql://USUARIO:CLAVE@HOST-INTERNO:5432/apps` (host = nombre interno del contenedor de PostgreSQL en Coolify) |
 | `DB_SCHEMA` | `acordes` |
-| `DB_SSL` | `true` |
-| `JWT_SECRET` | una cadena larga inventada |
+| `DB_SSL` | `false` (la base está en el mismo servidor) |
+| `JWT_SECRET` | una cadena larga al azar |
 | `ADMIN_USERNAME` | `admin` |
 | `ADMIN_PASSWORD` | la clave que quieras para el admin |
-| `PUBLIC_URL` | (lo completás en el paso 5) |
+| `PUBLIC_URL` | `https://acordes.pckairos.cloud` |
+| `NODE_ENV` | `production` |
 
-4. **Create Web Service**. En los **Logs** deberías ver:
+4. **Deploy**. En los **Logs** deberías ver:
    ```
    ✓ Conectado a Postgres.
    ✓ Admin "admin" creado desde variables de entorno.
@@ -51,16 +34,12 @@ La app crea sus tablas sola al arrancar, dentro de un **schema `acordes`** aisla
    ```
    (El schema `acordes`, las tablas y el admin se crean solos.)
 
-5. Render te da una URL pública. Copiala, ponela en **`PUBLIC_URL`** y guardá (redeploya solo).
-
-6. Entrá a tu URL, logueate con `admin` / tu clave. ¡Listo!
+5. Entrá a `https://acordes.pckairos.cloud` y logueate con `admin` / tu clave. ¡Listo!
 
 ---
 
 ## Notas
-- **Aislamiento:** todas las tablas de Acordes viven en el schema **`acordes`**. Tu otra
-  app (en `public` u otro schema) no se toca.
-- **Render free** duerme tras ~15 min sin uso (la 1ª visita tarda ~30-50 s en despertar).
-- **Supabase free** es permanente; alcanza de sobra para esta app.
-- Si ves errores de conexión: revisá que `DATABASE_URL` tenga la password correcta y que
-  sea el string del **pooler** (puerto 6543).
+- **Aislamiento:** todas las tablas de Acordes viven en el schema **`acordes`**.
+- **Siempre encendida:** en el VPS la app no se duerme.
+- **Respaldos:** Coolify respalda la base todos los días.
+- Si ves errores de conexión: revisá que `DATABASE_URL` tenga el host interno y la clave correctos.

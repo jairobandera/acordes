@@ -1,4 +1,4 @@
--- Schema de la app Acordes (PostgreSQL / Supabase).
+-- Schema de la app Acordes (PostgreSQL).
 -- TODO vive en el schema "acordes" para no tocar el schema public ni otra app.
 
 CREATE SCHEMA IF NOT EXISTS acordes;

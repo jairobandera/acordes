@@ -55,7 +55,7 @@ async function start() {
     await ensureAdmin();
   } catch (err) {
     console.error('✗ No se pudo conectar a Postgres:', err.message);
-    console.error('  Revisá DATABASE_URL (Supabase) en el archivo .env');
+    console.error('  Revisá DATABASE_URL en las variables de entorno (.env en local)');
   }
   app.listen(PORT, () => {
     console.log(`\n🎸 Acordes corriendo en  http://localhost:${PORT}\n`);

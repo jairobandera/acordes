@@ -9,7 +9,7 @@ App web para **buscar, scrapear, transponer y organizar** acordes de [lacuerda.n
 - 🎚️ **Transponer** de a medio tono (subir/bajar tonalidad) y **guardar la tonalidad**.
 - 🔁 **Varias versiones** por canción (las que ofrece lacuerda).
 - 👤 **Registro e inicio de sesión** (contraseñas hasheadas con bcrypt, sesión con JWT).
-- 💾 **Guardar canciones** por usuario (PostgreSQL / Supabase).
+- 💾 **Guardar canciones** por usuario (PostgreSQL).
 - 📂 **Listas de canciones** (setlists), con agregar/quitar y reordenar.
 - 🥁 **Metrónomo** por canción con BPM, compás (2/4, 3/4, 4/4, 5/4, 6/8, 7/8), **TAP tempo** y acento configurable: *primer golpe*, *todos* o *sin acento*.
 - 🔗 **Compartir listas** por link (y botón de **WhatsApp**) con todas las canciones, su tonalidad y BPM. La página compartida es pública y de solo lectura, sin login.
@@ -22,7 +22,7 @@ App web para **buscar, scrapear, transponer y organizar** acordes de [lacuerda.n
 
 - **Frontend:** HTML + CSS + JavaScript nativo (sin frameworks).
 - **Backend:** Node.js + Express.
-- **Base de datos:** PostgreSQL (Supabase). Todo vive en un schema `acordes` aislado.
+- **Base de datos:** PostgreSQL (en el VPS, junto a la app). Todo vive en un schema `acordes` aislado.
 - **Scraper:** nativo (fetch + cheerio), gratis y sin API keys. Funciona para lacuerda.net y cifraclub.com.
 
 ---
@@ -31,7 +31,7 @@ App web para **buscar, scrapear, transponer y organizar** acordes de [lacuerda.n
 
 ### 1. Requisitos
 - [Node.js](https://nodejs.org) 18 o superior (probado con v24).
-- Un proyecto de **Supabase** (PostgreSQL). La app corre contra Supabase también en local.
+- Una base **PostgreSQL** (local, o la del VPS por túnel SSH).
 
 ### 2. Instalar dependencias
 ```bash
@@ -39,8 +39,8 @@ npm install
 ```
 
 ### 3. Configurar variables de entorno
-Copiá `.env.example` a `.env` y pegá tu **connection string de Supabase** en `DATABASE_URL`
-(pestaña **Connection pooling** del dashboard). Dejá `DB_SCHEMA=acordes` y `DB_SSL=true`.
+Copiá `.env.example` a `.env` y pegá tu **connection string de PostgreSQL** en `DATABASE_URL`.
+Dejá `DB_SCHEMA=acordes`; `DB_SSL=false` para una base local o del mismo servidor.
 
 ### 4. Crear el schema y las tablas
 ```bash

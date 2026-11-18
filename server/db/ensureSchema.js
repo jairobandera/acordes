@@ -1,5 +1,5 @@
 // Crea el schema "acordes" y sus tablas si no existen (idempotente).
-// Se corre al arrancar el server, así en la nube (Supabase) no hace falta
+// Se corre al arrancar el server, así en el servidor no hace falta
 // inicializar nada a mano. NUNCA toca el schema public ni otras apps.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

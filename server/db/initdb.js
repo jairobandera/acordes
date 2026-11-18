@@ -1,4 +1,4 @@
-// Crea el schema "acordes" y sus tablas en Postgres/Supabase.
+// Crea el schema "acordes" y sus tablas en Postgres.
 // Uso: npm run init-db
 import 'dotenv/config';
 import { pool } from './pool.js';

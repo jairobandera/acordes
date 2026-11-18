@@ -1,6 +1,6 @@
-// Pool de conexiones PostgreSQL (Supabase).
+// Pool de conexiones PostgreSQL.
 // Todo vive en el schema "acordes" (search_path), así NO se toca el schema
-// public ni ninguna otra app del mismo proyecto Supabase.
+// public ni ninguna otra app de la misma base.
 //
 // Wrapper de compatibilidad: el resto del código usa estilo mysql2
 // (placeholders "?", destructuring `const [rows] = ...`, `result.insertId`,
@@ -11,7 +11,7 @@ import pg from 'pg';
 
 const SCHEMA = process.env.DB_SCHEMA || 'acordes';
 
-// Config: preferimos DATABASE_URL (string de conexión de Supabase); si no, vars sueltas.
+// Config: preferimos DATABASE_URL (string de conexión); si no, vars sueltas.
 const pgConfig = process.env.DATABASE_URL
   ? { connectionString: process.env.DATABASE_URL }
   : {
@@ -22,7 +22,7 @@ const pgConfig = process.env.DATABASE_URL
       database: process.env.DB_NAME || 'postgres',
     };
 
-// SSL para Supabase (y cualquier Postgres en la nube).
+// SSL para bases remotas que lo exijan (DB_SSL=false para una base local o del mismo servidor).
 if (String(process.env.DB_SSL || 'true').toLowerCase() !== 'false') {
   pgConfig.ssl = { rejectUnauthorized: false };
 }
