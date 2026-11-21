@@ -11,6 +11,7 @@ export class Metronome {
     this.beatsPerBar = 4;
     this.accentMode = 'first';
     this.isRunning = false;
+    this.muted = false;
 
     this._currentBeat = 0;
     this._nextNoteTime = 0;
@@ -47,6 +48,12 @@ export class Metronome {
 
   _scheduleClick(beatIndex, time) {
     const ctx = this.audioCtx;
+    const accentNow = this._isAccent(beatIndex);
+    if (this.muted) {
+      // Silenciado: sigue contando (no pierde la sincronización) pero no suena.
+      if (this.onBeat) setTimeout(() => this.onBeat(beatIndex, this.beatsPerBar, accentNow), Math.max(0, (time - ctx.currentTime) * 1000));
+      return;
+    }
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
@@ -87,6 +94,22 @@ export class Metronome {
     this._currentBeat = 0;
     this._nextNoteTime = this.audioCtx.currentTime + 0.05;
     this._timer = setInterval(() => this._scheduler(), this._lookahead);
+  }
+
+  /** Arranca con el primer golpe en un instante exacto del reloj del AudioContext. */
+  startAt(time) {
+    this.stop();
+    this._ensureCtx();
+    this.isRunning = true;
+    this._currentBeat = 0;
+    this._nextNoteTime = Math.max(time, this.audioCtx.currentTime + 0.02);
+    this._timer = setInterval(() => this._scheduler(), this._lookahead);
+  }
+
+  /** Corre los golpes siguientes (segundos; negativo = antes). */
+  shift(seconds) {
+    if (!this.isRunning) return;
+    this._nextNoteTime = Math.max(this.audioCtx.currentTime + 0.01, this._nextNoteTime + seconds);
   }
 
   stop() {

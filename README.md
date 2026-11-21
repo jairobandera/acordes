@@ -118,10 +118,15 @@ Acordes/
 
 ## Analizar música
 
-Entrá a **🎧 Analizar música** → **Escuchar**: la app graba ~10s del micrófono, identifica el tema
+Entrá a **🎧 Analizar música** → **Escuchar**: la app graba ~15s del micrófono, identifica el tema
 y muestra artista, **BPM**, **tonalidad** y un reproductor de YouTube. Botones para **usar ese BPM en
 el metrónomo** o **buscar los acordes** del tema. Necesita el microservicio Python corriendo
 (`ANALYZE_SERVICE_URL`); ver [DEPLOY.md](DEPLOY.md). En local requiere **ffmpeg** instalado.
+
+**Metrónomo sincronizado:** con **▶ Reproducir con metrónomo** arranca el tema y el micrófono escucha
+~8s para encontrar dónde caen los tiempos (`public/js/beat-sync.js`); recién ahí suena el metrónomo, en fase.
+Se ajusta con **− / +** (BPM) y **Antes / Después** (corre el clic 20 ms; queda guardado), se puede
+**silenciar** (sigue la música sola) y **re-sincronizar**. Al pausar o saltar en el video se vuelve a sincronizar.
 
 ## Notas
 

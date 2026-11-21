@@ -2,6 +2,7 @@
 import { api, getToken, setToken } from './api.js';
 import { transposeChord, keyAfterTranspose, detectKey } from './transpose.js';
 import { Metronome } from './metronome.js';
+import { BeatSync, nextBeat } from './beat-sync.js';
 import { loadChordDB, showChordPopover, chordDiagramHTML } from './chord-diagram.js';
 
 // ----------------------- Helpers DOM -----------------------
@@ -145,7 +146,10 @@ function switchView(name) {
   if (name === 'playlists') loadPlaylists();
   if (name === 'admin') loadAdmin();
   if (name === 'analyze') initAnalyze();
-  else stopListening(true); // al salir de "Analizar", corta cualquier grabación
+  else {
+    stopListening(true); // al salir de "Analizar", corta cualquier grabación
+    stopSyncPlayer();
+  }
 }
 
 $$('.nav-item').forEach((n) => {
@@ -531,7 +535,7 @@ $('#tapTempo').onclick = () => {
 };
 
 // ----------------------- Analizar música -----------------------
-const LISTEN_SECS = 10;
+const LISTEN_SECS = 15;
 const analyzeState = { stream: null, recorder: null, chunks: [], timer: null, countdown: null };
 
 function analyzeShow(which) {
@@ -543,6 +547,7 @@ function analyzeShow(which) {
 
 function initAnalyze() {
   stopListening(true);
+  stopSyncPlayer();
   $('#analyzeResult').innerHTML = '';
   $('#analyzeError').classList.add('hidden');
   analyzeShow('idle');
@@ -663,15 +668,12 @@ function renderAnalyzeResult(d) {
   // Reproductor de YouTube (tema completo) o link de búsqueda.
   if (d.youtube_id) {
     const wrap = el('div', 'yt-wrap');
-    const iframe = document.createElement('iframe');
-    iframe.className = 'yt-frame';
-    iframe.src = `https://www.youtube.com/embed/${d.youtube_id}`;
-    iframe.title = 'Reproductor';
-    iframe.loading = 'lazy';
-    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
-    iframe.allowFullscreen = true;
-    wrap.appendChild(iframe);
+    const holder = el('div', 'yt-frame');
+    holder.id = 'ytPlayer';
+    wrap.appendChild(holder);
     box.appendChild(wrap);
+    if (d.bpm) box.appendChild(buildSyncPanel(d.bpm));
+    createSyncPlayer(d.youtube_id);
   } else if (d.youtube_search) {
     const a = el('a', 'btn btn-secondary btn-block');
     a.href = d.youtube_search;
@@ -686,7 +688,7 @@ function renderAnalyzeResult(d) {
   if (d.bpm) {
     const useBpm = el('button', 'btn btn-secondary', '🥁 Usar este BPM en el metrónomo');
     useBpm.onclick = () => {
-      state.metronome.setBpm(d.bpm);
+      state.metronome.setBpm(Math.round(sync.bpm || d.bpm)); // el sincronizado, si ya se afinó
       toast(`Metrónomo a ${state.metronome.bpm} BPM ✓`, 'ok');
     };
     actions.appendChild(useBpm);
@@ -706,6 +708,221 @@ function renderAnalyzeResult(d) {
 
   box.appendChild(actions);
   analyzeShow('result');
+}
+
+// ---- Reproductor + metrónomo sincronizado con la canción ----
+// Al darle play suena el tema; el micrófono escucha unos segundos para encontrar dónde caen
+// los tiempos y recién ahí arranca el metrónomo, en fase. Después se ajusta con +/− y Antes/Después.
+const sync = {
+  player: null, metro: null, beat: null, stream: null, timer: null,
+  bpm: 0, locked: false, playing: false, lastState: null,
+  offset: Number(localStorage.getItem('acordes.syncOffset')) || 0, // ajuste fino guardado (seg)
+};
+let ytApiPromise = null;
+
+function loadYouTubeApi() {
+  if (window.YT?.Player) return Promise.resolve();
+  ytApiPromise ??= new Promise((resolve) => {
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { prev?.(); resolve(); };
+    const s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(s);
+  });
+  return ytApiPromise;
+}
+
+const fmtBpm = (b) => (Number.isInteger(b) ? String(b) : b.toFixed(1));
+
+function syncStatus(text, kind = '') {
+  const s = $('#syncStatus');
+  if (!s) return;
+  s.textContent = text;
+  s.className = `sync-status ${kind}`;
+}
+
+function buildSyncPanel(bpm) {
+  sync.bpm = bpm;
+  const p = el('div', 'sync-panel');
+  p.innerHTML = `
+    <div class="sync-top">
+      <button type="button" class="btn btn-primary" id="syncPlay">▶ Reproducir con metrónomo</button>
+      <div class="sync-dots" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    </div>
+    <div id="syncStatus" class="sync-status">Dale play: suena la canción, escucho el ritmo unos segundos y arranca el metrónomo sincronizado.</div>
+    <div class="sync-controls">
+      <div class="sync-group"><span class="sync-label">Tempo</span>
+        <button type="button" class="btn btn-secondary sync-sm" id="syncMinus" aria-label="Bajar BPM">−</button>
+        <b id="syncBpm">${fmtBpm(bpm)}</b><span class="sync-unit">BPM</span>
+        <button type="button" class="btn btn-secondary sync-sm" id="syncPlus" aria-label="Subir BPM">+</button>
+      </div>
+      <div class="sync-group"><span class="sync-label">Ajuste fino</span>
+        <button type="button" class="btn btn-secondary sync-sm" id="syncEarlier" title="El clic suena antes">◀ Antes</button>
+        <button type="button" class="btn btn-secondary sync-sm" id="syncLater" title="El clic suena después">Después ▶</button>
+      </div>
+      <div class="sync-group">
+        <button type="button" class="btn btn-secondary sync-sm" id="syncMute">🔇 Silenciar metrónomo</button>
+        <button type="button" class="btn btn-secondary sync-sm" id="syncAgain">🔄 Re-sincronizar</button>
+      </div>
+    </div>`;
+
+  p.querySelector('#syncPlay').onclick = async () => {
+    if (!sync.player?.playVideo) return;
+    if (sync.playing) { sync.player.pauseVideo(); return; }
+    ensureSyncAudio();
+    await ensureMic(); // pedirlo con el clic (en celulares hace falta)
+    sync.player.playVideo();
+  };
+  const setBpm = (v) => {
+    sync.bpm = Math.max(30, Math.min(300, Math.round(v * 10) / 10));
+    sync.metro?.setBpm(sync.bpm);
+    $('#syncBpm').textContent = fmtBpm(sync.bpm);
+  };
+  p.querySelector('#syncMinus').onclick = () => setBpm(Math.round(sync.bpm) - 1);
+  p.querySelector('#syncPlus').onclick = () => setBpm(Math.round(sync.bpm) + 1);
+  const nudge = (sec) => {
+    sync.offset = Math.max(-0.4, Math.min(0.4, sync.offset + sec));
+    localStorage.setItem('acordes.syncOffset', String(sync.offset));
+    sync.metro?.shift(sec);
+  };
+  p.querySelector('#syncEarlier').onclick = () => nudge(-0.02);
+  p.querySelector('#syncLater').onclick = () => nudge(0.02);
+  p.querySelector('#syncMute').onclick = (e) => {
+    ensureSyncAudio();
+    sync.metro.muted = !sync.metro.muted;
+    e.target.textContent = sync.metro.muted ? '🔊 Activar metrónomo' : '🔇 Silenciar metrónomo';
+  };
+  p.querySelector('#syncAgain').onclick = async () => {
+    if (!sync.playing) return syncStatus('Primero dale play a la canción.');
+    await ensureMic();
+    beginSync();
+  };
+  return p;
+}
+
+function ensureSyncAudio() {
+  if (!sync.metro) {
+    sync.metro = new Metronome();
+    sync.metro.setAccentMode('none'); // no sabemos cuál es el "1" del compás
+    sync.metro.onBeat = (i) => {
+      $$('.sync-dots i').forEach((d, j) => d.classList.toggle('on', j === i % 4));
+    };
+  }
+  sync.metro._ensureCtx();
+  sync.beat ??= new BeatSync(sync.metro.audioCtx);
+  sync.metro.setBpm(sync.bpm);
+}
+
+async function ensureMic() {
+  if (sync.stream) return true;
+  try {
+    // Sin cancelación de eco ni supresión de ruido: queremos oír la música tal cual.
+    sync.stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function releaseMic() {
+  sync.beat?.stop();
+  clearInterval(sync.timer);
+  sync.timer = null;
+  sync.stream?.getTracks().forEach((t) => t.stop());
+  sync.stream = null;
+}
+
+async function beginSync() {
+  ensureSyncAudio();
+  sync.metro.stop();
+  sync.locked = false;
+  clearInterval(sync.timer);
+  const ctx = sync.metro.audioCtx;
+
+  if (!(await ensureMic())) {
+    // Sin micrófono: arranca igual y se acomoda a mano.
+    sync.metro.startAt(ctx.currentTime + 0.1);
+    sync.locked = true;
+    syncStatus('Sin permiso de micrófono no puedo sincronizar solo: acomodalo con Antes / Después.', 'warn');
+    return;
+  }
+  sync.beat.start(sync.stream);
+  syncStatus('🎧 Escuchando el ritmo… (subí el volumen)');
+  sync.timer = setInterval(() => {
+    if (!sync.playing) return;
+    const secs = sync.beat.seconds;
+    if (secs < 8) { syncStatus(`🎧 Escuchando el ritmo… ${Math.ceil(8 - secs)}s`); return; }
+    const est = sync.beat.estimate(sync.bpm);
+    if (!est) return;
+    if (est.confidence < 1.8 && secs < 14) { syncStatus('🎧 Buscando el pulso…'); return; }
+    lockSync(est);
+  }, 1000);
+}
+
+function lockSync(est) {
+  const ctx = sync.metro.audioCtx;
+  const track = sync.stream?.getAudioTracks()[0];
+  releaseMic();
+  // Compensa lo que tarda el sonido en entrar (micrófono) y en salir (parlante).
+  const inLat = track?.getSettings?.().latency || 0.02;
+  const outLat = ctx.outputLatency || ctx.baseLatency || 0;
+  sync.bpm = est.bpm;
+  $('#syncBpm').textContent = fmtBpm(sync.bpm);
+  sync.metro.setBpm(sync.bpm);
+  const start = nextBeat(est.beatTime - inLat - outLat + sync.offset, sync.bpm, ctx.currentTime + 0.15);
+  sync.metro.startAt(start);
+  sync.locked = true;
+  const approx = est.confidence < 1.8;
+  syncStatus(
+    approx
+      ? `Sincronizado aproximado a ${fmtBpm(sync.bpm)} BPM: si no coincide, ajustalo con Antes / Después o +/−.`
+      : `✓ Sincronizado a ${fmtBpm(sync.bpm)} BPM. Si lo notás corrido, usá Antes / Después.`,
+    approx ? 'warn' : 'ok',
+  );
+}
+
+function onYtState(e) {
+  const S = window.YT.PlayerState;
+  const prev = sync.lastState;
+  sync.lastState = e.data;
+  const btn = $('#syncPlay');
+  if (e.data === S.PLAYING) {
+    sync.playing = true;
+    if (btn) btn.textContent = '⏸ Pausar';
+    // Primer play, vuelta de una pausa o salto en el video: sincroniza de nuevo.
+    if (sync.bpm && (!sync.locked || prev === S.BUFFERING)) beginSync();
+  } else if (e.data === S.PAUSED || e.data === S.ENDED) {
+    sync.playing = false;
+    sync.locked = false;
+    if (btn) btn.textContent = '▶ Reproducir con metrónomo';
+    sync.metro?.stop();
+    releaseMic();
+    $$('.sync-dots i').forEach((d) => d.classList.remove('on'));
+    if (sync.bpm) syncStatus(e.data === S.ENDED ? 'Terminó la canción.' : 'En pausa. Dale play y lo vuelvo a sincronizar.');
+  }
+}
+
+async function createSyncPlayer(videoId) {
+  await loadYouTubeApi();
+  if (!document.getElementById('ytPlayer')) return; // se fue de la vista
+  sync.player = new window.YT.Player('ytPlayer', {
+    videoId,
+    playerVars: { playsinline: 1, rel: 0 },
+    events: { onStateChange: onYtState },
+  });
+}
+
+function stopSyncPlayer() {
+  releaseMic();
+  sync.metro?.stop();
+  if (sync.metro) sync.metro.muted = false;
+  try { sync.player?.destroy(); } catch { /* noop */ }
+  sync.player = null;
+  sync.locked = false;
+  sync.playing = false;
+  sync.lastState = null;
 }
 
 $('#listenBtn').onclick = startListening;

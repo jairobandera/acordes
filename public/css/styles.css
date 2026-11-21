@@ -486,3 +486,29 @@ html, body { overflow-x: hidden; max-width: 100%; }
   .analyze-badges { justify-content: center; }
   .analyze-actions { flex-direction: column; }
 }
+
+/* ---- Metrónomo sincronizado con la canción ---- */
+.yt-wrap iframe { width: 100%; height: auto; aspect-ratio: 16 / 9; border: 0; border-radius: var(--radius); display: block; background: #000; }
+.sync-panel {
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+}
+.sync-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.sync-top .btn { flex: 1 1 220px; }
+.sync-dots { display: flex; gap: 8px; }
+.sync-dots i { width: 14px; height: 14px; border-radius: 50%; background: var(--border); transition: background .06s, transform .06s; }
+.sync-dots i.on { background: var(--primary); transform: scale(1.25); }
+.sync-status { font-size: 14px; color: var(--text-dim); }
+.sync-status.ok { color: #22c55e; font-weight: 600; }
+.sync-status.warn { color: #f59e0b; font-weight: 600; }
+.sync-controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.sync-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sync-label { font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); margin-right: 4px; }
+.sync-sm { padding: 6px 12px; font-size: 14px; }
+#syncBpm { font-size: 20px; min-width: 46px; text-align: center; }
+.sync-unit { font-size: 12px; color: var(--text-dim); }
+@media (max-width: 560px) {
+  .sync-controls { flex-direction: column; align-items: stretch; }
+  .sync-group { justify-content: center; }
+}
