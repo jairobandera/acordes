@@ -800,12 +800,27 @@ function buildSyncPanel(bpm) {
   };
 
   // Metrónomo
-  p.querySelector('#metroPlay').onclick = (e) => {
+  // Responde al APRETAR (pointerdown), no al soltar: así el primer clic suena al instante.
+  // El click queda solo para teclado (Enter / espacio).
+  const metroBtn = p.querySelector('#metroPlay');
+  let pressed = false;
+  const toggleMetro = () => {
     const m = ensureMetro();
     m.toggle();
-    e.currentTarget.textContent = m.isRunning ? '⏸ Metrónomo' : '▶ Metrónomo';
+    metroBtn.textContent = m.isRunning ? '⏸ Metrónomo' : '▶ Metrónomo';
     if (!m.isRunning) $$('.sync-dots i').forEach((d) => d.classList.remove('on'));
   };
+  metroBtn.onpointerdown = (e) => {
+    if (e.button !== 0) return;
+    pressed = true;
+    toggleMetro();
+  };
+  metroBtn.onclick = () => {
+    if (pressed) { pressed = false; return; }
+    toggleMetro();
+  };
+  // Cualquier toque en el panel (ej. el play de la música) ya deja el audio listo.
+  p.addEventListener('pointerdown', () => ensureMetro().warmUp(), { capture: true, once: true });
   p.querySelector('#metroVol').oninput = (e) => {
     sync.metroVol = Number(e.target.value);
     localStorage.setItem('acordes.metroVol', String(sync.metroVol));

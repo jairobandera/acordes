@@ -93,8 +93,15 @@ export class Metronome {
     this._ensureCtx();
     this.isRunning = true;
     this._currentBeat = 0;
-    this._nextNoteTime = this.audioCtx.currentTime + 0.05;
+    // Primer golpe casi inmediato y programado ya (sin esperar la primera vuelta del timer).
+    this._nextNoteTime = this.audioCtx.currentTime + 0.005;
+    this._scheduler();
     this._timer = setInterval(() => this._scheduler(), this._lookahead);
+  }
+
+  /** Crea y "despierta" el audio antes de que haga falta, para que el primer play no tarde. */
+  warmUp() {
+    this._ensureCtx();
   }
 
   /** Arranca con el primer golpe en un instante exacto del reloj del AudioContext. */
