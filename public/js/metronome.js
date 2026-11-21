@@ -12,6 +12,7 @@ export class Metronome {
     this.accentMode = 'first';
     this.isRunning = false;
     this.muted = false;
+    this.volume = 1; // multiplicador del volumen del clic (0 = mudo, 2 = doble)
 
     this._currentBeat = 0;
     this._nextNoteTime = 0;
@@ -50,7 +51,7 @@ export class Metronome {
     const ctx = this.audioCtx;
     const accentNow = this._isAccent(beatIndex);
     if (this.muted) {
-      // Silenciado: sigue contando (no pierde la sincronización) pero no suena.
+      // Silenciado: sigue contando (no pierde el tiempo) pero no suena.
       if (this.onBeat) setTimeout(() => this.onBeat(beatIndex, this.beatsPerBar, accentNow), Math.max(0, (time - ctx.currentTime) * 1000));
       return;
     }
@@ -62,7 +63,7 @@ export class Metronome {
     const accent = this._isAccent(beatIndex);
     // Acento = tono más agudo y más fuerte
     osc.frequency.value = accent ? 1500 : 800;
-    const peak = accent ? 0.6 : 0.3;
+    const peak = Math.max(0.0002, (accent ? 0.6 : 0.3) * this.volume);
 
     gain.gain.setValueAtTime(0, time);
     gain.gain.linearRampToValueAtTime(peak, time + 0.001);

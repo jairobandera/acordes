@@ -123,10 +123,10 @@ y muestra artista, **BPM**, **tonalidad** y un reproductor de YouTube. Botones p
 el metrónomo** o **buscar los acordes** del tema. Necesita el microservicio Python corriendo
 (`ANALYZE_SERVICE_URL`); ver [DEPLOY.md](DEPLOY.md). En local requiere **ffmpeg** instalado.
 
-**Metrónomo sincronizado:** con **▶ Reproducir con metrónomo** arranca el tema y el micrófono escucha
-~8s para encontrar dónde caen los tiempos (`public/js/beat-sync.js`); recién ahí suena el metrónomo, en fase.
-Se ajusta con **− / +** (BPM) y **Antes / Después** (corre el clic 20 ms; queda guardado), se puede
-**silenciar** (sigue la música sola) y **re-sincronizar**. Al pausar o saltar en el video se vuelve a sincronizar.
+**Música + metrónomo:** debajo del video hay un botón para la **música** y otro para el **metrónomo**
+(no arranca solo: lo prendés y comprobás a oído si el BPM detectado va con el tema). Cada uno tiene su
+**barra de volumen** y su botón de **silenciar**. El tempo se corrige con **− / +** y el clic se corre un
+poquito con **Antes / Después**.
 
 ## Notas
 
