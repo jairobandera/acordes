@@ -10,16 +10,17 @@ export function setToken(t) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
-async function request(method, path, body) {
+async function request(method, path, body, opts = {}) {
+  const raw = opts.raw === true; // body binario (Blob/ArrayBuffer): no se serializa a JSON
   const headers = {};
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (body !== undefined && !raw) headers['Content-Type'] = 'application/json';
   const token = getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`/api${path}`, {
     method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    headers, // si body es un Blob, fetch pone el Content-Type del propio Blob
+    body: body === undefined ? undefined : (raw ? body : JSON.stringify(body)),
   });
 
   let data = null;
@@ -65,6 +66,9 @@ export const api = {
   reorderPlaylist: (id, songIds) => request('PUT', `/playlists/${id}/order`, { song_ids: songIds }),
   sharePlaylist: (id) => request('POST', `/playlists/${id}/share`),
   unsharePlaylist: (id) => request('DELETE', `/playlists/${id}/share`),
+
+  // Analizar música (manda el audio del micrófono como binario crudo)
+  analyze: (blob) => request('POST', '/analyze', blob, { raw: true }),
 
   // Admin
   adminUsers: () => request('GET', '/admin/users'),

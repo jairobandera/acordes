@@ -13,6 +13,7 @@ import songRoutes from './routes/songs.js';
 import playlistRoutes from './routes/playlists.js';
 import adminRoutes from './routes/admin.js';
 import sharedRoutes from './routes/shared.js';
+import analyzeRoutes from './routes/analyze.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
@@ -29,6 +30,7 @@ app.use('/api/songs', songRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/shared', sharedRoutes);
+app.use('/api/analyze', analyzeRoutes);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

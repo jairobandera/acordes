@@ -25,6 +25,7 @@ La app crea sus tablas sola al arrancar, dentro de un **schema `acordes`** aisla
 | `ADMIN_PASSWORD` | la clave que quieras para el admin |
 | `PUBLIC_URL` | `https://acordes.pckairos.cloud` |
 | `NODE_ENV` | `production` |
+| `ANALYZE_SERVICE_URL` | host interno del microservicio Python (ver abajo), ej. `http://acordes-analyze:8000`. Dejalo vacío si todavía no desplegaste esa parte. |
 
 4. **Deploy**. En los **Logs** deberías ver:
    ```
@@ -35,6 +36,27 @@ La app crea sus tablas sola al arrancar, dentro de un **schema `acordes`** aisla
    (El schema `acordes`, las tablas y el admin se crean solos.)
 
 5. Entrá a `https://acordes.pckairos.cloud` y logueate con `admin` / tu clave. ¡Listo!
+
+---
+
+## Analizar música (microservicio Python) — opcional
+
+La función **"Analizar música"** (reconocer un tema por el micrófono y calcular BPM/tonalidad)
+corre en un **segundo servicio** Python (FastAPI), en la carpeta `python-service/` del mismo repo.
+El Node le habla por la red interna de Coolify; **no se expone a internet**.
+
+1. Coolify → proyecto **pckairos** → **New resource → Public repository** → mismo repo
+   `https://github.com/jairobandera/acordes`, rama `main`.
+2. **Base Directory**: `python-service`. Build pack **Dockerfile** (ya incluye **ffmpeg**, que hace falta).
+   Puerto interno **8000**. No le pongas dominio público (solo red interna).
+3. En el servicio **Node**, poné `ANALYZE_SERVICE_URL` apuntando al nombre interno de este
+   contenedor, ej. `http://acordes-analyze:8000` (el nombre lo da Coolify).
+4. Deploy. Probá `GET /health` del servicio Python: debería responder `{"ok":true,"ffmpeg":true}`.
+
+> El reconocimiento usa **shazamio** (motor de Shazam, gratis, no oficial). El BPM y la tonalidad
+> los calcula código propio (numpy) sobre un preview limpio de Deezer. Todo gratis, sin API keys.
+> Si este servicio no está desplegado, el resto de la app funciona igual; solo "Analizar música"
+> avisará que el servicio no está disponible.
 
 ---
 

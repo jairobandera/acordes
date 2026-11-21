@@ -69,7 +69,7 @@ function showApp() {
   const isAdmin = state.user.role === 'admin';
   // El admin solo ve Administración; el músico ve Buscar/Canciones/Listas.
   $('#navAdmin').classList.toggle('hidden', !isAdmin);
-  ['search', 'library', 'playlists'].forEach((v) => {
+  ['search', 'library', 'playlists', 'analyze'].forEach((v) => {
     const btn = document.querySelector(`.nav-item[data-view="${v}"]`);
     if (btn) btn.classList.toggle('hidden', isAdmin);
   });
@@ -144,6 +144,8 @@ function switchView(name) {
   if (name === 'library') loadLibrary();
   if (name === 'playlists') loadPlaylists();
   if (name === 'admin') loadAdmin();
+  if (name === 'analyze') initAnalyze();
+  else stopListening(true); // al salir de "Analizar", corta cualquier grabación
 }
 
 $$('.nav-item').forEach((n) => {
@@ -527,6 +529,187 @@ $('#tapTempo').onclick = () => {
     autosaveSettings();
   }
 };
+
+// ----------------------- Analizar música -----------------------
+const LISTEN_SECS = 10;
+const analyzeState = { stream: null, recorder: null, chunks: [], timer: null, countdown: null };
+
+function analyzeShow(which) {
+  $('#analyzeIdle').classList.toggle('hidden', which !== 'idle');
+  $('#analyzeListening').classList.toggle('hidden', which !== 'listening');
+  $('#analyzeWorking').classList.toggle('hidden', which !== 'working');
+  $('#analyzeResult').classList.toggle('hidden', which !== 'result');
+}
+
+function initAnalyze() {
+  stopListening(true);
+  $('#analyzeResult').innerHTML = '';
+  $('#analyzeError').classList.add('hidden');
+  analyzeShow('idle');
+}
+
+function showAnalyzeError(msg) {
+  analyzeShow('idle');
+  const e = $('#analyzeError');
+  e.textContent = msg;
+  e.classList.remove('hidden');
+}
+
+function stopTracks() {
+  if (analyzeState.stream) {
+    analyzeState.stream.getTracks().forEach((t) => t.stop());
+    analyzeState.stream = null;
+  }
+  clearTimeout(analyzeState.timer);
+  clearInterval(analyzeState.countdown);
+}
+
+// Cancela la grabación en curso. silent=true no cambia la vista (sirve al salir).
+function stopListening(silent) {
+  if (analyzeState.recorder && analyzeState.recorder.state !== 'inactive') {
+    analyzeState.recorder.onstop = null; // que NO dispare el análisis
+    try { analyzeState.recorder.stop(); } catch { /* noop */ }
+  }
+  stopTracks();
+  analyzeState.recorder = null;
+  analyzeState.chunks = [];
+  if (!silent) analyzeShow('idle');
+}
+
+async function startListening() {
+  $('#analyzeError').classList.add('hidden');
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    showAnalyzeError('Tu navegador no permite grabar audio. Probá con Chrome o Edge actualizados.');
+    return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    showAnalyzeError('No pude acceder al micrófono. Dale permiso al navegador e intentá de nuevo.');
+    return;
+  }
+  analyzeState.stream = stream;
+  analyzeState.chunks = [];
+
+  const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', '']
+    .find((m) => m === '' || (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)));
+  let rec;
+  try {
+    rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  } catch {
+    rec = new MediaRecorder(stream);
+  }
+  analyzeState.recorder = rec;
+  rec.ondataavailable = (e) => { if (e.data && e.data.size) analyzeState.chunks.push(e.data); };
+  rec.onstop = onRecordingStop;
+  rec.start();
+
+  analyzeShow('listening');
+  let left = LISTEN_SECS;
+  $('#listenCount').textContent = left;
+  analyzeState.countdown = setInterval(() => {
+    left -= 1;
+    $('#listenCount').textContent = Math.max(0, left);
+    if (left <= 0) clearInterval(analyzeState.countdown);
+  }, 1000);
+  analyzeState.timer = setTimeout(() => { try { rec.stop(); } catch { /* noop */ } }, LISTEN_SECS * 1000);
+}
+
+async function onRecordingStop() {
+  stopTracks();
+  const chunks = analyzeState.chunks.slice();
+  analyzeState.recorder = null;
+  analyzeState.chunks = [];
+  if (!chunks.length) { showAnalyzeError('No se grabó audio. Intentá de nuevo.'); return; }
+
+  const blob = new Blob(chunks, { type: chunks[0].type || 'audio/webm' });
+  analyzeShow('working');
+  try {
+    const data = await api.analyze(blob);
+    if (!data || !data.recognized) {
+      showAnalyzeError('No pude identificar la canción. Probá con más volumen, menos ruido y unos segundos más.');
+      return;
+    }
+    renderAnalyzeResult(data);
+  } catch (err) {
+    showAnalyzeError(err.message || 'Hubo un error analizando el audio.');
+  }
+}
+
+function renderAnalyzeResult(d) {
+  const box = $('#analyzeResult');
+  box.innerHTML = '';
+
+  const card = el('div', 'analyze-card');
+  if (d.cover) {
+    const img = el('img', 'analyze-cover');
+    img.src = d.cover;
+    img.alt = d.title || '';
+    img.referrerPolicy = 'no-referrer';
+    card.appendChild(img);
+  }
+  const info = el('div', 'analyze-info');
+  info.appendChild(el('div', 'analyze-title', d.title || '—'));
+  info.appendChild(el('div', 'analyze-artist', d.artist || ''));
+  const badges = el('div', 'analyze-badges');
+  if (d.bpm) badges.appendChild(el('span', 'badge key', `♩ ${d.bpm} BPM`));
+  if (d.key) badges.appendChild(el('span', 'badge', `♪ ${d.key}`));
+  if (d.bpm && d.bpm_source === 'micro') badges.appendChild(el('span', 'badge', 'aprox. (micrófono)'));
+  info.appendChild(badges);
+  card.appendChild(info);
+  box.appendChild(card);
+
+  // Reproductor de YouTube (tema completo) o link de búsqueda.
+  if (d.youtube_id) {
+    const wrap = el('div', 'yt-wrap');
+    const iframe = document.createElement('iframe');
+    iframe.className = 'yt-frame';
+    iframe.src = `https://www.youtube.com/embed/${d.youtube_id}`;
+    iframe.title = 'Reproductor';
+    iframe.loading = 'lazy';
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+    iframe.allowFullscreen = true;
+    wrap.appendChild(iframe);
+    box.appendChild(wrap);
+  } else if (d.youtube_search) {
+    const a = el('a', 'btn btn-secondary btn-block');
+    a.href = d.youtube_search;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = '▶ Buscar en YouTube';
+    box.appendChild(a);
+  }
+
+  // Acciones (integración con lo que ya existe).
+  const actions = el('div', 'analyze-actions');
+  if (d.bpm) {
+    const useBpm = el('button', 'btn btn-secondary', '🥁 Usar este BPM en el metrónomo');
+    useBpm.onclick = () => {
+      state.metronome.setBpm(d.bpm);
+      toast(`Metrónomo a ${state.metronome.bpm} BPM ✓`, 'ok');
+    };
+    actions.appendChild(useBpm);
+  }
+  const searchChords = el('button', 'btn btn-secondary', '🔎 Buscar acordes de este tema');
+  searchChords.onclick = () => {
+    const q = `${d.artist || ''} ${d.title || ''}`.trim();
+    $('#searchInput').value = q;
+    switchView('search');
+    $('#searchForm').requestSubmit();
+  };
+  actions.appendChild(searchChords);
+
+  const again = el('button', 'btn btn-primary', '🎧 Analizar otra');
+  again.onclick = initAnalyze;
+  actions.appendChild(again);
+
+  box.appendChild(actions);
+  analyzeShow('result');
+}
+
+$('#listenBtn').onclick = startListening;
+$('#listenCancel').onclick = () => stopListening(false);
 
 // ----------------------- Mis canciones -----------------------
 async function loadLibrary() {

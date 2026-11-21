@@ -79,6 +79,7 @@
         <button class="nav-item active" data-view="search">🔎 Buscar</button>
         <button class="nav-item" data-view="library">🎵 Mis canciones</button>
         <button class="nav-item" data-view="playlists">📂 Mis listas</button>
+        <button class="nav-item" data-view="analyze">🎧 Analizar música</button>
         <button class="nav-item hidden" data-view="admin" id="navAdmin">🛠️ Administración</button>
         <button class="nav-item" id="installBtn">📲 Crear acceso directo</button>
       </nav>
@@ -142,6 +143,30 @@
 
         <!-- Detalle de un usuario -->
         <div id="adminUserDetail" class="playlist-detail hidden"></div>
+      </section>
+
+      <!-- Vista: Analizar música -->
+      <section id="view-analyze" class="view hidden">
+        <h2 class="view-title">Analizar música</h2>
+        <p class="hint">Poné a sonar una canción cerca del micrófono y tocá <b>Escuchar</b>. La identifico y te muestro el nombre, artista, BPM, tonalidad y un reproductor.</p>
+
+        <div id="analyzeIdle" class="analyze-idle">
+          <button id="listenBtn" class="btn btn-primary listen-btn">🎧 Escuchar</button>
+        </div>
+
+        <div id="analyzeListening" class="analyze-listening hidden">
+          <div class="listen-pulse"></div>
+          <div class="listen-text">Escuchando… <span id="listenCount">10</span>s</div>
+          <button id="listenCancel" class="btn btn-secondary">Cancelar</button>
+        </div>
+
+        <div id="analyzeWorking" class="analyze-working hidden">
+          <div class="spinner"></div>
+          <div class="status">Identificando el tema…</div>
+        </div>
+
+        <div id="analyzeResult" class="analyze-result hidden"></div>
+        <div id="analyzeError" class="status error hidden"></div>
       </section>
 
       <!-- Vista: Canción (visor) -->

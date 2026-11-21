@@ -5,3 +5,9 @@ node_modules/
 CLAUDE.local.md
 .claude/
 graphify-out/
+
+# Python (python-service)
+__pycache__/
+*.pyc
+.venv/
+venv/

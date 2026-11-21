@@ -16,6 +16,7 @@ App web para **buscar, scrapear, transponer y organizar** acordes de [lacuerda.n
 - 👑 **Dos roles**: *músico* (uso normal) y *administrador*. El admin ve todos los usuarios y sus listas/canciones, puede **crear usuarios** y **deshabilitar/habilitar cuentas**.
 - 🎸 **Dos fuentes**: lacuerda.net y cifraclub.com (elegís en el buscador).
 - 🎵 **Diagramas de acordes**: tocás un acorde y ves el digitado en la guitarra.
+- 🎧 **Analizar música**: escucha por el micrófono, **identifica la canción exacta**, muestra artista/BPM/tonalidad y un **reproductor de YouTube**. El BPM y la tonalidad los calcula lógica propia (sin API); solo la identificación usa un servicio.
 - 📱 **Responsive** (se adapta a celular, tablet y escritorio).
 
 ## Stack
@@ -24,6 +25,7 @@ App web para **buscar, scrapear, transponer y organizar** acordes de [lacuerda.n
 - **Backend:** Node.js + Express.
 - **Base de datos:** PostgreSQL (en el VPS, junto a la app). Todo vive en un schema `acordes` aislado.
 - **Scraper:** nativo (fetch + cheerio), gratis y sin API keys. Funciona para lacuerda.net y cifraclub.com.
+- **Analizar música:** microservicio **Python** aparte (FastAPI) en `python-service/`. Reconoce el tema con **shazamio** (motor de Shazam) y calcula **BPM/tonalidad con algoritmos propios (numpy)** sobre un preview limpio de Deezer. Es opcional: si no está desplegado, el resto de la app anda igual.
 
 ---
 
@@ -98,14 +100,28 @@ Acordes/
 │   │   ├── pool.js         # Pool PostgreSQL (schema acordes) + wrapper
 │   │   ├── schema.sql      # Esquema de la base
 │   │   └── initdb.js       # Crea base y tablas
-│   ├── routes/             # auth, search, songs, playlists
+│   ├── routes/             # auth, search, songs, playlists, analyze (proxy)
 │   └── services/
 │       └── scraper.js      # scraper nativo (lacuerda + cifraclub) + parser
-└── public/                 # Frontend (HTML/CSS/JS nativo)
-    ├── index.html
-    ├── css/styles.css
-    └── js/                 # api, transpose, metronome, app
+├── public/                 # Frontend (HTML/CSS/JS nativo)
+│   ├── index.html
+│   ├── css/styles.css
+│   └── js/                 # api, transpose, metronome, app
+└── python-service/         # Microservicio "Analizar música" (FastAPI)
+    ├── app.py              # POST /analyze
+    ├── recognizer.py       # shazamio (identificación)
+    ├── clean_audio.py      # preview limpio (Deezer)
+    ├── tempo.py / key.py   # BPM y tonalidad: algoritmos propios (numpy)
+    ├── youtube.py          # videoId para el reproductor (sin key)
+    └── Dockerfile          # incluye ffmpeg
 ```
+
+## Analizar música
+
+Entrá a **🎧 Analizar música** → **Escuchar**: la app graba ~10s del micrófono, identifica el tema
+y muestra artista, **BPM**, **tonalidad** y un reproductor de YouTube. Botones para **usar ese BPM en
+el metrónomo** o **buscar los acordes** del tema. Necesita el microservicio Python corriendo
+(`ANALYZE_SERVICE_URL`); ver [DEPLOY.md](DEPLOY.md). En local requiere **ffmpeg** instalado.
 
 ## Notas
 
