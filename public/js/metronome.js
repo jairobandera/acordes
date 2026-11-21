@@ -11,8 +11,6 @@ export class Metronome {
     this.beatsPerBar = 4;
     this.accentMode = 'first';
     this.isRunning = false;
-    this.muted = false;
-    this.volume = 1; // multiplicador del volumen del clic (0 = mudo, 2 = doble)
 
     this._currentBeat = 0;
     this._nextNoteTime = 0;
@@ -49,12 +47,6 @@ export class Metronome {
 
   _scheduleClick(beatIndex, time) {
     const ctx = this.audioCtx;
-    const accentNow = this._isAccent(beatIndex);
-    if (this.muted) {
-      // Silenciado: sigue contando (no pierde el tiempo) pero no suena.
-      if (this.onBeat) setTimeout(() => this.onBeat(beatIndex, this.beatsPerBar, accentNow), Math.max(0, (time - ctx.currentTime) * 1000));
-      return;
-    }
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
@@ -63,7 +55,7 @@ export class Metronome {
     const accent = this._isAccent(beatIndex);
     // Acento = tono más agudo y más fuerte
     osc.frequency.value = accent ? 1500 : 800;
-    const peak = Math.max(0.0002, (accent ? 0.6 : 0.3) * this.volume);
+    const peak = accent ? 0.6 : 0.3;
 
     gain.gain.setValueAtTime(0, time);
     gain.gain.linearRampToValueAtTime(peak, time + 0.001);
@@ -97,27 +89,6 @@ export class Metronome {
     this._nextNoteTime = this.audioCtx.currentTime + 0.005;
     this._scheduler();
     this._timer = setInterval(() => this._scheduler(), this._lookahead);
-  }
-
-  /** Crea y "despierta" el audio antes de que haga falta, para que el primer play no tarde. */
-  warmUp() {
-    this._ensureCtx();
-  }
-
-  /** Arranca con el primer golpe en un instante exacto del reloj del AudioContext. */
-  startAt(time) {
-    this.stop();
-    this._ensureCtx();
-    this.isRunning = true;
-    this._currentBeat = 0;
-    this._nextNoteTime = Math.max(time, this.audioCtx.currentTime + 0.02);
-    this._timer = setInterval(() => this._scheduler(), this._lookahead);
-  }
-
-  /** Corre los golpes siguientes (segundos; negativo = antes). */
-  shift(seconds) {
-    if (!this.isRunning) return;
-    this._nextNoteTime = Math.max(this.audioCtx.currentTime + 0.01, this._nextNoteTime + seconds);
   }
 
   stop() {

@@ -671,7 +671,7 @@ function renderAnalyzeResult(d) {
     holder.id = 'ytPlayer';
     wrap.appendChild(holder);
     box.appendChild(wrap);
-    if (d.bpm) box.appendChild(buildSyncPanel(d.bpm));
+    box.appendChild(buildSyncPanel(d.bpm));
     createSyncPlayer(d.youtube_id);
   } else if (d.youtube_search) {
     const a = el('a', 'btn btn-secondary btn-block');
@@ -687,7 +687,7 @@ function renderAnalyzeResult(d) {
   if (d.bpm) {
     const useBpm = el('button', 'btn btn-secondary', '🥁 Usar este BPM en el metrónomo');
     useBpm.onclick = () => {
-      state.metronome.setBpm(Math.round(sync.bpm || d.bpm)); // el ajustado con − / +, si lo cambió
+      state.metronome.setBpm(Math.round(d.bpm));
       toast(`Metrónomo a ${state.metronome.bpm} BPM ✓`, 'ok');
     };
     actions.appendChild(useBpm);
@@ -709,12 +709,11 @@ function renderAnalyzeResult(d) {
   analyzeShow('result');
 }
 
-// ---- Reproductor de la canción + metrónomo (cada uno con su play, volumen y mute) ----
-// El metrónomo no arranca solo: el usuario lo prende y comprueba a oído si el BPM detectado va con el tema.
+// ---- Reproductor de la canción (play, volumen y silenciar) + BPM detectado ----
+// El metrónomo no se reproduce acá: solo se muestra el BPM (sonar a la par del tema es complicado).
 const sync = {
-  player: null, metro: null, bpm: 0,
+  player: null,
   musicVol: Number(localStorage.getItem('acordes.musicVol') ?? 80),
-  metroVol: Number(localStorage.getItem('acordes.metroVol') ?? 70),
   musicMuted: false,
 };
 let ytApiPromise = null;
@@ -731,56 +730,21 @@ function loadYouTubeApi() {
   return ytApiPromise;
 }
 
-const fmtBpm = (b) => (Number.isInteger(b) ? String(b) : b.toFixed(1));
-
-function ensureMetro() {
-  if (!sync.metro) {
-    sync.metro = new Metronome();
-    sync.metro.setAccentMode('none'); // no sabemos cuál es el "1" del compás
-    sync.metro.onBeat = (i) => {
-      $$('.sync-dots i').forEach((d, j) => d.classList.toggle('on', j === i % 4));
-    };
-  }
-  sync.metro.volume = sync.metroVol / 50;
-  sync.metro.setBpm(sync.bpm);
-  return sync.metro;
-}
-
 function buildSyncPanel(bpm) {
-  sync.bpm = bpm;
   const p = el('div', 'sync-panel');
   p.innerHTML = `
     <div class="sync-top">
       <button type="button" class="btn btn-primary" id="musicPlay">▶ Música</button>
-      <button type="button" class="btn btn-secondary" id="metroPlay">▶ Metrónomo</button>
-      <div class="sync-dots" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      ${bpm ? `<div class="sync-bpm"><b>${bpm}</b><span>BPM</span></div>` : ''}
     </div>
-    <div class="sync-status">Poné la música y prendé el metrónomo para comprobar a oído si el BPM detectado va con el tema. Si no, ajustalo con − / +.</div>
     <div class="sync-mixer">
       <div class="mix-row">
-        <span class="mix-name">🎵 Música</span>
+        <span class="mix-name">🎵 Volumen</span>
         <input type="range" id="musicVol" min="0" max="100" value="${sync.musicVol}" aria-label="Volumen de la música">
         <button type="button" class="btn btn-secondary sync-sm mute-btn" id="musicMute" title="Silenciar música">🔊</button>
       </div>
-      <div class="mix-row">
-        <span class="mix-name">🥁 Metrónomo</span>
-        <input type="range" id="metroVol" min="0" max="100" value="${sync.metroVol}" aria-label="Volumen del metrónomo">
-        <button type="button" class="btn btn-secondary sync-sm mute-btn" id="metroMute" title="Silenciar metrónomo">🔊</button>
-      </div>
-    </div>
-    <div class="sync-controls">
-      <div class="sync-group"><span class="sync-label">Tempo</span>
-        <button type="button" class="btn btn-secondary sync-sm" id="syncMinus" aria-label="Bajar BPM">−</button>
-        <b id="syncBpm">${fmtBpm(bpm)}</b><span class="sync-unit">BPM</span>
-        <button type="button" class="btn btn-secondary sync-sm" id="syncPlus" aria-label="Subir BPM">+</button>
-      </div>
-      <div class="sync-group"><span class="sync-label">Ajuste fino</span>
-        <button type="button" class="btn btn-secondary sync-sm" id="syncEarlier" title="Corre el clic un poquito antes">◀ Antes</button>
-        <button type="button" class="btn btn-secondary sync-sm" id="syncLater" title="Corre el clic un poquito después">Después ▶</button>
-      </div>
     </div>`;
 
-  // Música (YouTube)
   p.querySelector('#musicPlay').onclick = () => {
     if (!sync.player?.getPlayerState) return;
     const S = window.YT.PlayerState;
@@ -798,51 +762,6 @@ function buildSyncPanel(bpm) {
     e.currentTarget.textContent = sync.musicMuted ? '🔇' : '🔊';
     e.currentTarget.classList.toggle('muted', sync.musicMuted);
   };
-
-  // Metrónomo
-  // Responde al APRETAR (pointerdown), no al soltar: así el primer clic suena al instante.
-  // El click queda solo para teclado (Enter / espacio).
-  const metroBtn = p.querySelector('#metroPlay');
-  let pressed = false;
-  const toggleMetro = () => {
-    const m = ensureMetro();
-    m.toggle();
-    metroBtn.textContent = m.isRunning ? '⏸ Metrónomo' : '▶ Metrónomo';
-    if (!m.isRunning) $$('.sync-dots i').forEach((d) => d.classList.remove('on'));
-  };
-  metroBtn.onpointerdown = (e) => {
-    if (e.button !== 0) return;
-    pressed = true;
-    toggleMetro();
-  };
-  metroBtn.onclick = () => {
-    if (pressed) { pressed = false; return; }
-    toggleMetro();
-  };
-  // Cualquier toque en el panel (ej. el play de la música) ya deja el audio listo.
-  p.addEventListener('pointerdown', () => ensureMetro().warmUp(), { capture: true, once: true });
-  p.querySelector('#metroVol').oninput = (e) => {
-    sync.metroVol = Number(e.target.value);
-    localStorage.setItem('acordes.metroVol', String(sync.metroVol));
-    if (sync.metro) sync.metro.volume = sync.metroVol / 50;
-  };
-  p.querySelector('#metroMute').onclick = (e) => {
-    const m = ensureMetro();
-    m.muted = !m.muted;
-    e.currentTarget.textContent = m.muted ? '🔇' : '🔊';
-    e.currentTarget.classList.toggle('muted', m.muted);
-  };
-
-  // Tempo y ajuste fino
-  const setBpm = (v) => {
-    sync.bpm = Math.max(30, Math.min(300, v));
-    sync.metro?.setBpm(sync.bpm);
-    $('#syncBpm').textContent = fmtBpm(sync.bpm);
-  };
-  p.querySelector('#syncMinus').onclick = () => setBpm(Math.round(sync.bpm) - 1);
-  p.querySelector('#syncPlus').onclick = () => setBpm(Math.round(sync.bpm) + 1);
-  p.querySelector('#syncEarlier').onclick = () => sync.metro?.shift(-0.02);
-  p.querySelector('#syncLater').onclick = () => sync.metro?.shift(0.02);
   return p;
 }
 
@@ -868,8 +787,6 @@ async function createSyncPlayer(videoId) {
 }
 
 function stopSyncPlayer() {
-  sync.metro?.stop();
-  if (sync.metro) sync.metro.muted = false;
   sync.musicMuted = false;
   try { sync.player?.destroy(); } catch { /* noop */ }
   sync.player = null;

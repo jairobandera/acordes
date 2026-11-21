@@ -123,10 +123,9 @@ y muestra artista, **BPM**, **tonalidad** y un reproductor de YouTube. Botones p
 el metrónomo** o **buscar los acordes** del tema. Necesita el microservicio Python corriendo
 (`ANALYZE_SERVICE_URL`); ver [DEPLOY.md](DEPLOY.md). En local requiere **ffmpeg** instalado.
 
-**Música + metrónomo:** debajo del video hay un botón para la **música** y otro para el **metrónomo**
-(no arranca solo: lo prendés y comprobás a oído si el BPM detectado va con el tema). Cada uno tiene su
-**barra de volumen** y su botón de **silenciar**. El tempo se corrige con **− / +** y el clic se corre un
-poquito con **Antes / Después**.
+**Reproductor:** debajo del video hay un botón de **play/pausa**, una **barra de volumen** y un botón
+de **silenciar**, junto al **BPM detectado** (el metrónomo no suena acá; con "Usar este BPM en el metrónomo"
+se pasa al metrónomo de la app).
 
 ## Notas
 
